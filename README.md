@@ -1,93 +1,138 @@
 # Flussonic Auth Backend
 
-A modern, standalone FastAPI-based authentication backend for Flussonic Media Server with SQLite database, built with Python 3.12, uv package manager, and following latest best practices.
+A standalone FastAPI authentication backend for Flussonic Media Server with SQLite database, built with Python 3.12 and uv package manager.
 
 ## Features
 
-- **Modern Python 3.12**: Uses latest type hints (`|` union types, `Mapped` types)
-- **UV Package Manager**: Fast, modern dependency management
-- **Token-based Authentication**: Validate client access using tokens
-- **Session Management**: Track and limit concurrent streaming sessions per user
-- **Status Control**: Active, suspended, and expired token states
-- **Access Control**:
-  - IP whitelist per token
-  - Stream whitelist per token
-  - Time-based validity periods
-- **Concurrent Session Limiting**: Configure max simultaneous streams per token
-- **Access Logging**: Comprehensive audit trail for all authorization requests
-- **Management API**: RESTful API for token and session administration
-- **Docker Support**: Ready-to-deploy Docker container with multi-stage builds
-- **Background Cleanup**: Automatic cleanup of expired sessions
-- **Code Quality**: Pre-commit hooks, ruff linting, mypy type checking
+- Token-based authentication for Flussonic Media Server
+- Session management with concurrent stream limiting
+- Status control (active, suspended, expired)
+- IP and stream whitelisting per token
+- Time-based token validity
+- Comprehensive access logging
+- RESTful management API
+- Docker support
+- Automatic session cleanup
 
 ## Quick Start
 
 ### Using Docker (Recommended)
 
 ```bash
-# Clone and start
-git clone <repository-url>
-cd auth-backend
 docker-compose up -d
-
-# View logs
-docker-compose logs -f
-
-# The service will be available on http://localhost:8080
 ```
 
-### Using UV (Development)
+The service will be available on http://localhost:8080
 
+### Local Development
+
+1. **Create virtual environment and install dependencies:**
 ```bash
-# Install uv (if not already installed)
-curl -LsSf https://astral.sh/uv/install.sh | sh
+uv venv
+uv pip install -e .
+```
 
-# Install dependencies
-uv pip install -e ".[dev]"
+2. **Activate virtual environment:**
+```bash
+# Windows
+.venv\Scripts\activate
 
-# Setup pre-commit hooks
-pre-commit install
+# Linux/Mac
+source .venv/bin/activate
+```
 
-# Run the application
-make run
-# Or directly:
+3. **Run the application:**
+```bash
 python -m uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload
 ```
 
-## Development Commands
+## Configuration
+
+Create a `.env` file (see `.env.example`):
 
 ```bash
-# Install dependencies
-make install      # Production dependencies
-make dev          # Development dependencies + pre-commit
+DATABASE_URL=sqlite:///./data/tokens.db
+AUTH_DURATION=180
+SESSION_CLEANUP_INTERVAL=60
+LOG_LEVEL=INFO
+ENABLE_ACCESS_LOGS=true
+API_HOST=0.0.0.0
+API_PORT=8080
+API_KEY=your-secret-api-key  # Optional
+```
 
-# Code quality
-make lint         # Run ruff and mypy
-make format       # Format code with ruff
+## Flussonic Configuration
 
-# Testing
-make test         # Run pytest with coverage
+Add to `/etc/flussonic/flussonic.conf`:
 
-# Run locally
-make run          # Start with auto-reload
+```
+auth_backend myauth {
+  backend http://your-server:8080/auth;
+}
 
-# Docker
-make docker-build
-make docker-up
-make docker-down
-make docker-logs
-
-# Clean
-make clean        # Remove cache and artifacts
+stream mystream {
+  url http://source-stream;
+  auth myauth;
+}
 ```
 
 ## API Documentation
 
-Once running, visit:
-- **Swagger UI**: http://localhost:8080/docs
-- **ReDoc**: http://localhost:8080/redoc
+Visit http://localhost:8080/docs for interactive API documentation.
 
-For complete API documentation and usage examples, see the full documentation in the `/docs` endpoint.
+### Main Endpoints
+
+- **GET/POST** `/auth` - Authorization endpoint (called by Flussonic)
+- **POST** `/api/tokens` - Create token
+- **GET** `/api/tokens` - List tokens
+- **PATCH** `/api/tokens/{id}` - Update token
+- **DELETE** `/api/tokens/{id}` - Delete token
+- **GET** `/api/sessions` - List active sessions
+- **DELETE** `/api/sessions/{id}` - Terminate session
+
+## Usage Examples
+
+### Create a Token
+
+```bash
+curl -X POST http://localhost:8080/api/tokens \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-secret-key" \
+  -d '{
+    "token": "secure-token-123",
+    "user_id": "user-001",
+    "status": "active",
+    "max_sessions": 2
+  }'
+```
+
+### Test Authorization
+
+```bash
+curl -v "http://localhost:8080/auth?name=stream1&ip=192.168.1.100&token=secure-token-123&proto=hls"
+```
+
+## Project Structure
+
+```
+auth-backend/
+├── app/
+│   ├── main.py           # FastAPI application
+│   ├── config.py         # Configuration
+│   ├── routes.py         # All API routes
+│   ├── core/
+│   │   └── logging.py    # Logging setup
+│   ├── models/           # Database models
+│   ├── services/         # Business logic
+│   ├── schemas/          # Pydantic schemas
+│   └── utils/            # Utilities
+├── data/                 # SQLite database
+├── logs/                 # Application logs
+├── .venv/                # Virtual environment
+├── pyproject.toml        # Project configuration
+├── Dockerfile
+└── docker-compose.yml
+```
 
 ## License
 
