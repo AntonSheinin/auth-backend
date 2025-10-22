@@ -1,19 +1,21 @@
-"""Validation service for authorization logic"""
-from sqlalchemy.orm import Session
-from app.models.token import Token
-from app.models.log import AccessLog
-from app.services.token_service import TokenService
-from app.services.session_service import SessionService
-from app.utils.session_id import generate_session_id
-from app.config import get_settings
-from typing import Tuple, Optional
+"""Validation service for authorization logic."""
+
 from datetime import datetime
+
+from sqlalchemy.orm import Session
+
+from app.config import get_settings
+from app.models.log import AccessLog
+from app.models.token import Token
+from app.services.session_service import SessionService
+from app.services.token_service import TokenService
+from app.utils.session_id import generate_session_id
 
 settings = get_settings()
 
 
 class ValidationService:
-    """Service for authorization validation logic"""
+    """Service for authorization validation logic."""
 
     @staticmethod
     def validate_authorization(
@@ -22,7 +24,7 @@ class ValidationService:
         client_ip: str,
         token: str,
         protocol: str = "unknown",
-    ) -> Tuple[bool, Optional[str], Optional[Token]]:
+    ) -> tuple[bool, str | None, Token | None]:
         """
         Validate authorization request from Flussonic
 
@@ -130,13 +132,13 @@ class ValidationService:
     def _log_access(
         db: Session,
         token: str,
-        user_id: Optional[str],
+        user_id: str | None,
         stream_name: str,
         client_ip: str,
         protocol: str,
         result: str,
         reason: str,
-    ):
+    ) -> None:
         """Log access attempt to database if logging is enabled"""
         if not settings.enable_access_logs:
             return
