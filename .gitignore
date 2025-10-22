@@ -54,25 +54,5 @@ data/
 .DS_Store
 Thumbs.db
 
-# Logs
-logs/
-*.log
-
-# Test & Coverage
-.pytest_cache/
-.coverage
-htmlcov/
-.tox/
-coverage.xml
-*.cover
-
-# Ruff
-.ruff_cache/
-
-# Mypy
-.mypy_cache/
-.dmypy.json
-dmypy.json
-
 # Docker
 docker-compose.override.yml

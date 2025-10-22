@@ -5,9 +5,11 @@ from app.models.log import AccessLog
 from app.services.token_service import TokenService
 from app.services.session_service import SessionService
 from app.utils.session_id import generate_session_id
-from app.config import settings
+from app.config import get_settings
 from typing import Tuple, Optional
 from datetime import datetime
+
+settings = get_settings()
 
 
 class ValidationService:
@@ -116,7 +118,7 @@ class ValidationService:
                 stream_name=stream_name,
                 client_ip=client_ip,
                 protocol=protocol,
-                auth_duration=settings.AUTH_DURATION,
+                auth_duration=settings.auth_duration,
             )
 
             ValidationService._log_access(
@@ -135,8 +137,8 @@ class ValidationService:
         result: str,
         reason: str,
     ):
-        """Log access attempt if logging is enabled"""
-        if not settings.ENABLE_ACCESS_LOGS:
+        """Log access attempt to database if logging is enabled"""
+        if not settings.enable_access_logs:
             return
 
         log_entry = AccessLog(

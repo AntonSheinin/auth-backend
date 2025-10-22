@@ -9,7 +9,7 @@ A standalone FastAPI authentication backend for Flussonic Media Server with SQLi
 - Status control (active, suspended, expired)
 - IP and stream whitelisting per token
 - Time-based token validity
-- Comprehensive access logging
+- Access logging to database
 - RESTful management API
 - Docker support
 - Automatic session cleanup
@@ -90,6 +90,21 @@ Visit http://localhost:8080/docs for interactive API documentation.
 - **GET** `/api/sessions` - List active sessions
 - **DELETE** `/api/sessions/{id}` - Terminate session
 
+## Logging
+
+- **Console Logging**: All application logs output to console (stdout)
+- **Access Logs**: Authentication attempts saved to SQLite database (`access_logs` table)
+- No log files are created - use Docker logs or redirect console output as needed
+
+View logs:
+```bash
+# Docker
+docker-compose logs -f
+
+# Local
+python -m uvicorn app.main:app --log-level info
+```
+
 ## Usage Examples
 
 ### Create a Token
@@ -127,7 +142,6 @@ auth-backend/
 │   ├── schemas/          # Pydantic schemas
 │   └── utils/            # Utilities
 ├── data/                 # SQLite database
-├── logs/                 # Application logs
 ├── .venv/                # Virtual environment
 ├── pyproject.toml        # Project configuration
 ├── Dockerfile

@@ -18,8 +18,8 @@ RUN uv pip install --no-cache -e .
 # Copy application
 COPY ./app ./app
 
-# Create data and logs directories
-RUN mkdir -p /app/data /app/logs
+# Create data directory
+RUN mkdir -p /app/data
 
 # Expose port
 EXPOSE 8080

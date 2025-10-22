@@ -8,7 +8,6 @@ services:
       - "8080:8080"
     volumes:
       - ./data:/app/data          # Persist SQLite database
-      - ./logs:/app/logs          # Persist logs
       - ./app:/app/app            # For development hot-reload (optional)
     environment:
       - DATABASE_URL=sqlite:///./data/tokens.db
