@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  auth-backend:
+    build: .
+    container_name: flussonic-auth-backend
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/app/data          # Persist SQLite database
+      - ./logs:/app/logs          # Persist logs
+      - ./app:/app/app            # For development hot-reload (optional)
+    environment:
+      - DATABASE_URL=sqlite:///./data/tokens.db
+      - AUTH_DURATION=180
+      - SESSION_CLEANUP_INTERVAL=60
+      - LOG_LEVEL=INFO
+      - ENABLE_ACCESS_LOGS=true
+      - API_HOST=0.0.0.0
+      - API_PORT=8080
+      # Optional: Set API key for management endpoints
+      # - API_KEY=your-secret-api-key
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
