@@ -1,25 +1,26 @@
 """Token service for database operations"""
-from sqlalchemy.orm import Session
-from app.models.token import Token
-from typing import Optional, List
 from datetime import datetime
+
+from sqlalchemy.orm import Session
+
+from app.models.token import Token
 
 
 class TokenService:
     """Service for token-related database operations"""
 
     @staticmethod
-    def get_by_token(db: Session, token: str) -> Optional[Token]:
+    def get_by_token(db: Session, token: str) -> Token | None:
         """Get token by token string"""
         return db.query(Token).filter(Token.token == token).first()
 
     @staticmethod
-    def get_by_id(db: Session, token_id: int) -> Optional[Token]:
+    def get_by_id(db: Session, token_id: int) -> Token | None:
         """Get token by ID"""
         return db.query(Token).filter(Token.id == token_id).first()
 
     @staticmethod
-    def get_by_user_id(db: Session, user_id: str) -> List[Token]:
+    def get_by_user_id(db: Session, user_id: str) -> list[Token]:
         """Get all tokens for a user"""
         return db.query(Token).filter(Token.user_id == user_id).all()
 
@@ -30,11 +31,11 @@ class TokenService:
         user_id: str,
         status: str = "active",
         max_sessions: int = 1,
-        valid_from: Optional[datetime] = None,
-        valid_until: Optional[datetime] = None,
-        allowed_ips: Optional[List[str]] = None,
-        allowed_streams: Optional[List[str]] = None,
-        metadata: Optional[dict] = None,
+        valid_from: datetime | None = None,
+        valid_until: datetime | None = None,
+        allowed_ips: list[str] | None = None,
+        allowed_streams: list[str] | None = None,
+        meta: dict | None = None,
     ) -> Token:
         """Create a new token"""
         db_token = Token(
@@ -50,8 +51,8 @@ class TokenService:
             db_token.set_allowed_ips(allowed_ips)
         if allowed_streams:
             db_token.set_allowed_streams(allowed_streams)
-        if metadata:
-            db_token.set_meta(metadata)
+        if meta:
+            db_token.set_meta(meta)
 
         db.add(db_token)
         db.commit()
@@ -59,7 +60,7 @@ class TokenService:
         return db_token
 
     @staticmethod
-    def update_token(db: Session, token_id: int, **kwargs) -> Optional[Token]:
+    def update_token(db: Session, token_id: int, **kwargs) -> Token | None:
         """Update token fields"""
         db_token = TokenService.get_by_id(db, token_id)
         if not db_token:
@@ -72,7 +73,7 @@ class TokenService:
                     db_token.set_allowed_ips(value)
                 elif key == "allowed_streams" and isinstance(value, list):
                     db_token.set_allowed_streams(value)
-                elif key == "metadata" and isinstance(value, dict):
+                elif key == "meta" and isinstance(value, dict):
                     db_token.set_meta(value)
                 elif hasattr(db_token, key):
                     setattr(db_token, key, value)
@@ -96,10 +97,10 @@ class TokenService:
     @staticmethod
     def list_tokens(
         db: Session,
-        status: Optional[str] = None,
+        status: str | None = None,
         skip: int = 0,
         limit: int = 100,
-    ) -> List[Token]:
+    ) -> list[Token]:
         """List tokens with optional filtering"""
         query = db.query(Token)
 

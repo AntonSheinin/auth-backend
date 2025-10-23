@@ -1,36 +1,39 @@
-"""Pydantic schemas for management API"""
-from pydantic import BaseModel, Field
-from typing import Optional, List
+"""Pydantic schemas for management API."""
+
 from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class TokenCreate(BaseModel):
-    """Schema for creating a new token"""
+    """Schema for creating a new token."""
 
     token: str = Field(..., description="Token string (must be unique)")
     user_id: str = Field(..., description="User identifier")
     status: str = Field("active", description="Token status: active, suspended, expired")
     max_sessions: int = Field(1, description="Maximum concurrent sessions allowed")
-    valid_from: Optional[datetime] = Field(None, description="Token valid from (defaults to now)")
-    valid_until: Optional[datetime] = Field(None, description="Token valid until (NULL = no expiration)")
-    allowed_ips: Optional[List[str]] = Field(None, description="List of allowed IP addresses")
-    allowed_streams: Optional[List[str]] = Field(None, description="List of allowed stream names")
-    metadata: Optional[dict] = Field(None, description="Additional metadata")
+    valid_from: datetime | None = Field(None, description="Token valid from (defaults to now)")
+    valid_until: datetime | None = Field(None, description="Token valid until (NULL = no expiration)")
+    allowed_ips: list[str] | None = Field(None, description="List of allowed IP addresses")
+    allowed_streams: list[str] | None = Field(None, description="List of allowed stream names")
+    meta: dict | None = Field(None, description="Additional metadata")
 
 
 class TokenUpdate(BaseModel):
-    """Schema for updating an existing token"""
+    """Schema for updating an existing token."""
 
-    status: Optional[str] = Field(None, description="Token status: active, suspended, expired")
-    max_sessions: Optional[int] = Field(None, description="Maximum concurrent sessions allowed")
-    valid_until: Optional[datetime] = Field(None, description="Token valid until")
-    allowed_ips: Optional[List[str]] = Field(None, description="List of allowed IP addresses")
-    allowed_streams: Optional[List[str]] = Field(None, description="List of allowed stream names")
-    metadata: Optional[dict] = Field(None, description="Additional metadata")
+    status: str | None = Field(None, description="Token status: active, suspended, expired")
+    max_sessions: int | None = Field(None, description="Maximum concurrent sessions allowed")
+    valid_until: datetime | None = Field(None, description="Token valid until")
+    allowed_ips: list[str] | None = Field(None, description="List of allowed IP addresses")
+    allowed_streams: list[str] | None = Field(None, description="List of allowed stream names")
+    meta: dict | None = Field(None, description="Additional metadata")
 
 
 class TokenResponse(BaseModel):
-    """Schema for token response"""
+    """Schema for token response."""
+
+    model_config = ConfigDict(from_attributes=True)
 
     id: int
     token: str
@@ -38,19 +41,18 @@ class TokenResponse(BaseModel):
     status: str
     max_sessions: int
     valid_from: datetime
-    valid_until: Optional[datetime]
-    allowed_ips: Optional[List[str]]
-    allowed_streams: Optional[List[str]]
-    metadata: Optional[dict]
+    valid_until: datetime | None
+    allowed_ips: list[str] | None
+    allowed_streams: list[str] | None
+    meta: dict | None
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
-
 
 class SessionResponse(BaseModel):
-    """Schema for active session response"""
+    """Schema for active session response."""
+
+    model_config = ConfigDict(from_attributes=True)
 
     id: int
     session_id: str
@@ -61,7 +63,4 @@ class SessionResponse(BaseModel):
     protocol: str
     started_at: datetime
     last_checked_at: datetime
-    expires_at: Optional[datetime]
-
-    class Config:
-        from_attributes = True
+    expires_at: datetime | None

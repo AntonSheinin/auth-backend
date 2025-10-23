@@ -81,7 +81,7 @@ async def authorize(
     error_response = DeniedResponse(
         error="access_denied",
         reason=denial_reason or "unknown",
-        message=error_messages.get(denial_reason, "Access denied"),
+        message=error_messages.get(denial_reason or "", "Access denied"),
         user_id=token_obj.user_id if token_obj else None,
     )
 
@@ -128,7 +128,7 @@ async def create_token(
         valid_until=token_data.valid_until,
         allowed_ips=token_data.allowed_ips,
         allowed_streams=token_data.allowed_streams,
-        metadata=token_data.metadata,
+        meta=token_data.meta,
     )
 
     logger.info(f"Token created: {db_token.token} for user {db_token.user_id}")
@@ -177,7 +177,7 @@ async def update_token(
         valid_until=token_update.valid_until,
         allowed_ips=token_update.allowed_ips,
         allowed_streams=token_update.allowed_streams,
-        metadata=token_update.metadata,
+        meta=token_update.meta,
     )
 
     if not db_token:
@@ -212,7 +212,7 @@ async def list_sessions(
     limit: Annotated[int, Query(ge=1, le=1000)] = 100,
     db: Session = Depends(get_db),
     _: str | None = Depends(verify_api_key),
-) -> list[SessionResponse]:
+) -> list:  # noqa: ANN202
     """List active sessions with optional user filtering."""
     sessions = SessionService.list_sessions(db, user_id=user_id, skip=skip, limit=limit)
     return sessions
@@ -223,7 +223,7 @@ async def get_user_sessions(
     user_id: str,
     db: Session = Depends(get_db),
     _: str | None = Depends(verify_api_key),
-) -> list[SessionResponse]:
+) -> list:  # noqa: ANN202
     """Get all active sessions for a specific user."""
     sessions = SessionService.get_active_sessions_by_user(db, user_id)
     return sessions
@@ -270,7 +270,7 @@ def _token_to_response(token: Token) -> TokenResponse:
         valid_until=token.valid_until,
         allowed_ips=token.get_allowed_ips(),
         allowed_streams=token.get_allowed_streams(),
-        metadata=token.get_meta(),
+        meta=token.get_meta(),
         created_at=token.created_at,
         updated_at=token.updated_at,
     )
