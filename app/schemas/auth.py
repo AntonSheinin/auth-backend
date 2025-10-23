@@ -1,19 +1,19 @@
-"""Pydantic schemas for auth endpoint"""
+"""Pydantic schemas for auth endpoint."""
+
 from pydantic import BaseModel, Field
-from typing import Optional
 
 
 class AuthRequest(BaseModel):
-    """Request from Flussonic for authorization"""
+    """Request from Flussonic for authorization."""
 
     name: str = Field(..., description="Stream name")
     ip: str = Field(..., description="Client IP address")
     token: str = Field(..., description="Authorization token")
-    proto: Optional[str] = Field(None, description="Protocol (hls, rtmp, rtsp, etc.)")
+    proto: str | None = Field(None, description="Protocol (hls, rtmp, rtsp, etc.)")
 
 
 class AuthResponse(BaseModel):
-    """Successful authorization response (HTTP 200)"""
+    """Successful authorization response (HTTP 200)."""
 
     user_id: str = Field(..., description="User identifier for X-UserId header")
     max_sessions: int = Field(..., description="Max concurrent sessions for X-Max-Sessions header")
@@ -21,7 +21,7 @@ class AuthResponse(BaseModel):
 
 
 class DeniedResponse(BaseModel):
-    """Access denied response (HTTP 403)"""
+    """Access denied response (HTTP 403)."""
 
     error: str = Field("access_denied", description="Error type")
     reason: str = Field(
@@ -30,4 +30,4 @@ class DeniedResponse(BaseModel):
         "max_sessions_reached, ip_not_allowed, stream_not_allowed",
     )
     message: str = Field(..., description="Human-readable error message")
-    user_id: Optional[str] = Field(None, description="User ID if token was found")
+    user_id: str | None = Field(None, description="User ID if token was found")
