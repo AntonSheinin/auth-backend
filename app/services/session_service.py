@@ -1,20 +1,21 @@
-"""Session service for managing active streaming sessions"""
-from sqlalchemy.orm import Session
-from app.models.session import ActiveSession
-from typing import Optional, List
+"""Session service for managing active streaming sessions."""
 from datetime import datetime, timedelta
+
+from sqlalchemy.orm import Session
+
+from app.models.session import ActiveSession
 
 
 class SessionService:
     """Service for session-related database operations"""
 
     @staticmethod
-    def get_by_session_id(db: Session, session_id: str) -> Optional[ActiveSession]:
-        """Get session by session ID"""
+    def get_by_session_id(db: Session, session_id: str) -> ActiveSession | None:
+        """Get session by session ID."""
         return db.query(ActiveSession).filter(ActiveSession.session_id == session_id).first()
 
     @staticmethod
-    def get_active_sessions_by_user(db: Session, user_id: str) -> List[ActiveSession]:
+    def get_active_sessions_by_user(db: Session, user_id: str) -> list[ActiveSession]:
         """Get all active sessions for a user (excluding expired)"""
         now = datetime.now()
         return (
@@ -27,7 +28,7 @@ class SessionService:
         )
 
     @staticmethod
-    def count_active_sessions_by_user(db: Session, user_id: str, exclude_session_id: Optional[str] = None) -> int:
+    def count_active_sessions_by_user(db: Session, user_id: str, exclude_session_id: str | None = None) -> int:
         """Count active sessions for a user, optionally excluding a specific session"""
         now = datetime.now()
         query = db.query(ActiveSession).filter(
@@ -73,7 +74,7 @@ class SessionService:
         return db_session
 
     @staticmethod
-    def update_session_last_check(db: Session, session_id: str, auth_duration: int = 180) -> Optional[ActiveSession]:
+    def update_session_last_check(db: Session, session_id: str, auth_duration: int = 180) -> ActiveSession | None:
         """Update session's last checked timestamp and extend expiration"""
         db_session = SessionService.get_by_session_id(db, session_id)
         if not db_session:
@@ -116,10 +117,10 @@ class SessionService:
     @staticmethod
     def list_sessions(
         db: Session,
-        user_id: Optional[str] = None,
+        user_id: str | None = None,
         skip: int = 0,
         limit: int = 100,
-    ) -> List[ActiveSession]:
+    ) -> list[ActiveSession]:
         """List active sessions with optional user filtering"""
         query = db.query(ActiveSession)
 
@@ -129,7 +130,7 @@ class SessionService:
         return query.order_by(ActiveSession.started_at.desc()).offset(skip).limit(limit).all()
 
     @staticmethod
-    def get_oldest_session_for_user(db: Session, user_id: str) -> Optional[ActiveSession]:
+    def get_oldest_session_for_user(db: Session, user_id: str) -> ActiveSession | None:
         """Get the oldest session for a user (for potential termination)"""
         return (
             db.query(ActiveSession)
