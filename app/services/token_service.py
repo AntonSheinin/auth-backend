@@ -51,7 +51,7 @@ class TokenService:
         if allowed_streams:
             db_token.set_allowed_streams(allowed_streams)
         if metadata:
-            db_token.set_metadata(metadata)
+            db_token.set_meta(metadata)
 
         db.add(db_token)
         db.commit()
@@ -73,7 +73,7 @@ class TokenService:
                 elif key == "allowed_streams" and isinstance(value, list):
                     db_token.set_allowed_streams(value)
                 elif key == "metadata" and isinstance(value, dict):
-                    db_token.set_metadata(value)
+                    db_token.set_meta(value)
                 elif hasattr(db_token, key):
                     setattr(db_token, key, value)
 

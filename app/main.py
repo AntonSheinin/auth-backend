@@ -2,16 +2,17 @@
 
 import asyncio
 import logging
+import uvicorn
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
-from fastapi.responses import JSONResponse
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.config import get_settings
-from app.core.logging import setup_logging
-from app.models.database import SessionLocal, init_db
+from app.logging import setup_logging
 from app.routes import auth_router, management_router
+from app.services.database import SessionLocal, init_db
 from app.services.session_service import SessionService
 
 # Setup logging first
@@ -31,8 +32,8 @@ async def cleanup_expired_sessions_task() -> None:
                 count = SessionService.cleanup_expired_sessions(db)
                 if count > 0:
                     logger.info(f"Cleaned up {count} expired sessions")
-            except Exception as e:
-                logger.error(f"Error during session cleanup: {e}", exc_info=True)
+            except SQLAlchemyError as e:
+                logger.error(f"Database error during session cleanup: {e}", exc_info=True)
             finally:
                 db.close()
 
@@ -82,29 +83,31 @@ app.include_router(auth_router)
 app.include_router(management_router)
 
 
-@app.get("/", tags=["health"])
-async def root() -> dict[str, str]:
-    """Root endpoint."""
+@app.get("/", tags=["info"])
+async def root() -> dict[str, str | dict[str, str]]:
+    """Root endpoint with API information."""
     return {
         "service": "Flussonic Auth Backend",
         "version": "1.0.0",
-        "status": "running",
+        "status": "healthy",
+        "endpoints": {
+            "docs": "/docs",
+            "redoc": "/redoc",
+            "health": "/health",
+            "auth": "/auth",
+            "management": "/api",
+        },
     }
 
 
 @app.get("/health", tags=["health"])
-async def health_check() -> JSONResponse:
+async def health_check() -> dict[str, str]:
     """Health check endpoint for Docker."""
-    return JSONResponse(
-        content={"status": "healthy"},
-        status_code=200,
-    )
+    return {"status": "healthy"}
 
 
 def main() -> None:
     """Entry point for running the application."""
-    import uvicorn
-
     uvicorn.run(
         "app.main:app",
         host=settings.api_host,

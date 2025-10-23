@@ -89,7 +89,7 @@ class ValidationService:
 
         if existing_session:
             # This is a re-check (Flussonic checks every 3 minutes)
-            SessionService.update_session_last_check(db, session_id, settings.AUTH_DURATION)
+            SessionService.update_session_last_check(db, session_id, settings.auth_duration)
             ValidationService._log_access(
                 db, token, token_obj.user_id, stream_name, client_ip, protocol, "allowed", "session_recheck"
             )

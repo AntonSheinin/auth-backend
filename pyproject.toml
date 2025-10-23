@@ -2,33 +2,16 @@
 name = "flussonic-auth-backend"
 version = "1.0.0"
 description = "Authentication backend for Flussonic Media Server with token and session management"
-authors = [
-    {name = "Your Name", email = "your.email@example.com"}
-]
 readme = "README.md"
 requires-python = ">=3.12"
-license = {text = "MIT"}
-keywords = ["flussonic", "authentication", "streaming", "fastapi"]
-classifiers = [
-    "Development Status :: 4 - Beta",
-    "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.12",
-    "Framework :: FastAPI",
-]
-
 dependencies = [
-    "fastapi>=0.109.0",
-    "uvicorn[standard]>=0.27.0",
+    "fastapi>=0.115.5",
+    "uvicorn[standard]>=0.31.2",
     "sqlalchemy>=2.0.25",
-    "pydantic>=2.5.3",
-    "pydantic-settings>=2.1.0",
+    "pydantic>=2.10.3",
+    "pydantic-settings>=2.6.1",
     "python-multipart>=0.0.6",
 ]
-
-[project.scripts]
-auth-backend = "app.main:main"
 
 [build-system]
 requires = ["hatchling"]

@@ -14,7 +14,3 @@ def setup_logging() -> None:
         level=getattr(logging, settings.log_level),
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
-
-    # Reduce noise from third-party libraries
-    logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
-    logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)

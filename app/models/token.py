@@ -9,7 +9,7 @@ from sqlalchemy import DateTime, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
 
-from app.models.database import Base
+from app.services.database import Base
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +28,7 @@ class Token(Base):
     valid_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     allowed_ips: Mapped[str | None] = mapped_column(Text, nullable=True)
     allowed_streams: Mapped[str | None] = mapped_column(Text, nullable=True)
-    metadata: Mapped[str | None] = mapped_column(Text, nullable=True)
+    meta: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), onupdate=func.now())
 
@@ -52,14 +52,14 @@ class Token(Base):
             logger.warning(f"Failed to parse allowed_streams for token {self.id}: {e}")
             return None
 
-    def get_metadata(self) -> dict[str, Any]:
+    def get_meta(self) -> dict[str, Any]:
         """Parse metadata JSON field."""
-        if not self.metadata:
+        if not self.meta:
             return {}
         try:
-            return json.loads(self.metadata)
+            return json.loads(self.meta)
         except json.JSONDecodeError as e:
-            logger.warning(f"Failed to parse metadata for token {self.id}: {e}")
+            logger.warning(f"Failed to parse meta for token {self.id}: {e}")
             return {}
 
     def set_allowed_ips(self, ips: list[str]) -> None:
@@ -70,9 +70,9 @@ class Token(Base):
         """Set allowed_streams as JSON."""
         self.allowed_streams = json.dumps(streams)
 
-    def set_metadata(self, data: dict[str, Any]) -> None:
+    def set_meta(self, data: dict[str, Any]) -> None:
         """Set metadata as JSON."""
-        self.metadata = json.dumps(data)
+        self.meta = json.dumps(data)
 
     def __repr__(self) -> str:
         """String representation of Token."""

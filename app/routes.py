@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response, 
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
-from app.models.database import get_db
+from app.services.database import get_db
 from app.models.token import Token
 from app.schemas.auth import DeniedResponse
 from app.schemas.management import SessionResponse, TokenCreate, TokenResponse, TokenUpdate
@@ -270,7 +270,7 @@ def _token_to_response(token: Token) -> TokenResponse:
         valid_until=token.valid_until,
         allowed_ips=token.get_allowed_ips(),
         allowed_streams=token.get_allowed_streams(),
-        metadata=token.get_metadata(),
+        metadata=token.get_meta(),
         created_at=token.created_at,
         updated_at=token.updated_at,
     )

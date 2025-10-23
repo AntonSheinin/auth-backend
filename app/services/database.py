@@ -1,4 +1,4 @@
-"""Database setup and session management."""
+"""Database connection and session management."""
 
 import logging
 from collections.abc import Generator
