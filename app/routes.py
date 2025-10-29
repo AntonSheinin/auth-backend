@@ -4,7 +4,7 @@ import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response, status
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.services.database import get_db
@@ -35,7 +35,7 @@ async def authorize(
     ip: Annotated[str, Query(description="Client IP address")],
     token: Annotated[str, Query(description="Authorization token")],
     proto: Annotated[str, Query(description="Protocol (hls, rtmp, rtsp, etc.)")] = "unknown",
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> Response:
     """
     Main authorization endpoint called by Flussonic Media Server.
@@ -46,7 +46,7 @@ async def authorize(
     logger.info(f"Auth request: stream={name}, ip={ip}, token={token[:10]}..., proto={proto}")
 
     # Validate authorization
-    is_allowed, denial_reason, token_obj = ValidationService.validate_authorization(
+    is_allowed, denial_reason, token_obj = await ValidationService.validate_authorization(
         db=db,
         stream_name=name,
         client_ip=ip,
@@ -100,7 +100,7 @@ async def authorize(
 def verify_api_key(x_api_key: str | None = Header(None)) -> str | None:
     """Verify API key if configured."""
     if settings.api_key and x_api_key != settings.api_key:
-        logger.warning(f"Invalid API key attempt: {x_api_key}")
+        logger.warning("Invalid API key attempt detected")
         raise HTTPException(status_code=401, detail="Invalid or missing API key")
     return x_api_key
 
@@ -108,17 +108,17 @@ def verify_api_key(x_api_key: str | None = Header(None)) -> str | None:
 @management_router.post("/tokens", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 async def create_token(
     token_data: TokenCreate,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     _: str | None = Depends(verify_api_key),
 ) -> TokenResponse:
     """Create a new authentication token."""
     # Check if token already exists
-    existing = TokenService.get_by_token(db, token_data.token)
+    existing = await TokenService.get_by_token(db, token_data.token)
     if existing:
         logger.warning(f"Attempt to create duplicate token: {token_data.token}")
         raise HTTPException(status_code=400, detail="Token already exists")
 
-    db_token = TokenService.create_token(
+    db_token = await TokenService.create_token(
         db=db,
         token=token_data.token,
         user_id=token_data.user_id,
@@ -140,22 +140,22 @@ async def list_tokens(
     status_filter: Annotated[str | None, Query(alias="status", description="Filter by status")] = None,
     skip: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=1000)] = 100,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     _: str | None = Depends(verify_api_key),
 ) -> list[TokenResponse]:
     """List all tokens with optional filtering."""
-    tokens = TokenService.list_tokens(db, status=status_filter, skip=skip, limit=limit)
+    tokens = await TokenService.list_tokens(db, status=status_filter, skip=skip, limit=limit)
     return [_token_to_response(t) for t in tokens]
 
 
 @management_router.get("/tokens/{token_id}", response_model=TokenResponse)
 async def get_token(
     token_id: int,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     _: str | None = Depends(verify_api_key),
 ) -> TokenResponse:
     """Get a specific token by ID."""
-    db_token = TokenService.get_by_id(db, token_id)
+    db_token = await TokenService.get_by_id(db, token_id)
     if not db_token:
         raise HTTPException(status_code=404, detail="Token not found")
     return _token_to_response(db_token)
@@ -165,11 +165,11 @@ async def get_token(
 async def update_token(
     token_id: int,
     token_update: TokenUpdate,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     _: str | None = Depends(verify_api_key),
 ) -> TokenResponse:
     """Update a token's settings."""
-    db_token = TokenService.update_token(
+    db_token = await TokenService.update_token(
         db=db,
         token_id=token_id,
         status=token_update.status,
@@ -190,11 +190,11 @@ async def update_token(
 @management_router.delete("/tokens/{token_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_token(
     token_id: int,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     _: str | None = Depends(verify_api_key),
 ) -> None:
     """Delete a token."""
-    success = TokenService.delete_token(db, token_id)
+    success = await TokenService.delete_token(db, token_id)
     if not success:
         raise HTTPException(status_code=404, detail="Token not found")
     logger.info(f"Token deleted: ID {token_id}")
@@ -210,33 +210,33 @@ async def list_sessions(
     user_id: Annotated[str | None, Query(description="Filter by user ID")] = None,
     skip: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=1000)] = 100,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     _: str | None = Depends(verify_api_key),
 ) -> list:  # noqa: ANN202
     """List active sessions with optional user filtering."""
-    sessions = SessionService.list_sessions(db, user_id=user_id, skip=skip, limit=limit)
+    sessions = await SessionService.list_sessions(db, user_id=user_id, skip=skip, limit=limit)
     return sessions
 
 
 @management_router.get("/sessions/user/{user_id}", response_model=list[SessionResponse])
 async def get_user_sessions(
     user_id: str,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     _: str | None = Depends(verify_api_key),
 ) -> list:  # noqa: ANN202
     """Get all active sessions for a specific user."""
-    sessions = SessionService.get_active_sessions_by_user(db, user_id)
+    sessions = await SessionService.get_active_sessions_by_user(db, user_id)
     return sessions
 
 
 @management_router.delete("/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def terminate_session(
     session_id: str,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     _: str | None = Depends(verify_api_key),
 ) -> None:
     """Terminate a specific session."""
-    success = SessionService.delete_session(db, session_id)
+    success = await SessionService.delete_session(db, session_id)
     if not success:
         raise HTTPException(status_code=404, detail="Session not found")
     logger.info(f"Session terminated: {session_id}")
@@ -244,11 +244,11 @@ async def terminate_session(
 
 @management_router.post("/sessions/cleanup", status_code=status.HTTP_200_OK)
 async def cleanup_sessions(
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     _: str | None = Depends(verify_api_key),
 ) -> dict[str, int]:
     """Manually trigger cleanup of expired sessions."""
-    count = SessionService.cleanup_expired_sessions(db)
+    count = await SessionService.cleanup_expired_sessions(db)
     logger.info(f"Cleaned up {count} expired sessions")
     return {"cleaned": count}
 

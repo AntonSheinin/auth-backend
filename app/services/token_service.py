@@ -1,7 +1,8 @@
 """Token service for database operations"""
 from datetime import datetime
 
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.token import Token
 
@@ -10,23 +11,26 @@ class TokenService:
     """Service for token-related database operations"""
 
     @staticmethod
-    def get_by_token(db: Session, token: str) -> Token | None:
+    async def get_by_token(db: AsyncSession, token: str) -> Token | None:
         """Get token by token string"""
-        return db.query(Token).filter(Token.token == token).first()
+        result = await db.execute(select(Token).filter(Token.token == token))
+        return result.scalar_one_or_none()
 
     @staticmethod
-    def get_by_id(db: Session, token_id: int) -> Token | None:
+    async def get_by_id(db: AsyncSession, token_id: int) -> Token | None:
         """Get token by ID"""
-        return db.query(Token).filter(Token.id == token_id).first()
+        result = await db.execute(select(Token).filter(Token.id == token_id))
+        return result.scalar_one_or_none()
 
     @staticmethod
-    def get_by_user_id(db: Session, user_id: str) -> list[Token]:
+    async def get_by_user_id(db: AsyncSession, user_id: str) -> list[Token]:
         """Get all tokens for a user"""
-        return db.query(Token).filter(Token.user_id == user_id).all()
+        result = await db.execute(select(Token).filter(Token.user_id == user_id))
+        return list(result.scalars().all())
 
     @staticmethod
-    def create_token(
-        db: Session,
+    async def create_token(
+        db: AsyncSession,
         token: str,
         user_id: str,
         status: str = "active",
@@ -55,14 +59,14 @@ class TokenService:
             db_token.set_meta(meta)
 
         db.add(db_token)
-        db.commit()
-        db.refresh(db_token)
+        await db.commit()
+        await db.refresh(db_token)
         return db_token
 
     @staticmethod
-    def update_token(db: Session, token_id: int, **kwargs) -> Token | None:
+    async def update_token(db: AsyncSession, token_id: int, **kwargs) -> Token | None:
         """Update token fields"""
-        db_token = TokenService.get_by_id(db, token_id)
+        db_token = await TokenService.get_by_id(db, token_id)
         if not db_token:
             return None
 
@@ -79,32 +83,34 @@ class TokenService:
                     setattr(db_token, key, value)
 
         db_token.updated_at = datetime.now()
-        db.commit()
-        db.refresh(db_token)
+        await db.commit()
+        await db.refresh(db_token)
         return db_token
 
     @staticmethod
-    def delete_token(db: Session, token_id: int) -> bool:
+    async def delete_token(db: AsyncSession, token_id: int) -> bool:
         """Delete a token"""
-        db_token = TokenService.get_by_id(db, token_id)
+        db_token = await TokenService.get_by_id(db, token_id)
         if not db_token:
             return False
 
-        db.delete(db_token)
-        db.commit()
+        await db.delete(db_token)
+        await db.commit()
         return True
 
     @staticmethod
-    def list_tokens(
-        db: Session,
+    async def list_tokens(
+        db: AsyncSession,
         status: str | None = None,
         skip: int = 0,
         limit: int = 100,
     ) -> list[Token]:
         """List tokens with optional filtering"""
-        query = db.query(Token)
+        query = select(Token)
 
         if status:
             query = query.filter(Token.status == status)
 
-        return query.offset(skip).limit(limit).all()
+        query = query.offset(skip).limit(limit)
+        result = await db.execute(query)
+        return list(result.scalars().all())

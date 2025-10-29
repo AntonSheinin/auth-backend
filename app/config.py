@@ -35,12 +35,6 @@ class Settings(BaseSettings):
         le=600,
         description="Cleanup expired sessions interval in seconds",
     )
-    max_response_time: float = Field(
-        default=2.5,
-        ge=0.1,
-        le=3.0,
-        description="Stay under Flussonic's 3s timeout requirement",
-    )
 
     # Logging
     log_level: str = Field(

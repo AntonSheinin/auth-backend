@@ -12,7 +12,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.config import get_settings
 from app.logging import setup_logging
 from app.routes import auth_router, management_router
-from app.services.database import SessionLocal, init_db
+from app.services.database import AsyncSessionLocal, init_db
 from app.services.session_service import SessionService
 
 # Setup logging first
@@ -27,15 +27,13 @@ async def cleanup_expired_sessions_task() -> None:
         try:
             await asyncio.sleep(settings.session_cleanup_interval)
 
-            db = SessionLocal()
-            try:
-                count = SessionService.cleanup_expired_sessions(db)
-                if count > 0:
-                    logger.info(f"Cleaned up {count} expired sessions")
-            except SQLAlchemyError as e:
-                logger.error(f"Database error during session cleanup: {e}", exc_info=True)
-            finally:
-                db.close()
+            async with AsyncSessionLocal() as db:
+                try:
+                    count = await SessionService.cleanup_expired_sessions(db)
+                    if count > 0:
+                        logger.info(f"Cleaned up {count} expired sessions")
+                except SQLAlchemyError as e:
+                    logger.error(f"Database error during session cleanup: {e}", exc_info=True)
 
         except asyncio.CancelledError:
             logger.info("Session cleanup task cancelled")
@@ -49,7 +47,7 @@ async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:
     """Lifespan context manager for startup and shutdown events."""
     # Startup
     logger.info("Starting Flussonic Auth Backend...")
-    init_db()
+    await init_db()
     logger.info(f"Server starting on {settings.api_host}:{settings.api_port}")
 
     # Start background cleanup task

@@ -1,7 +1,8 @@
 """Session service for managing active streaming sessions."""
 from datetime import datetime, timedelta
 
-from sqlalchemy.orm import Session
+from sqlalchemy import delete, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.session import ActiveSession
 
@@ -10,28 +11,37 @@ class SessionService:
     """Service for session-related database operations"""
 
     @staticmethod
-    def get_by_session_id(db: Session, session_id: str) -> ActiveSession | None:
+    async def get_by_session_id(db: AsyncSession, session_id: str) -> ActiveSession | None:
         """Get session by session ID."""
-        return db.query(ActiveSession).filter(ActiveSession.session_id == session_id).first()
+        result = await db.execute(select(ActiveSession).filter(ActiveSession.session_id == session_id))
+        return result.scalar_one_or_none()
 
     @staticmethod
-    def get_active_sessions_by_user(db: Session, user_id: str) -> list[ActiveSession]:
+    async def get_active_sessions_by_user(db: AsyncSession, user_id: str) -> list[ActiveSession]:
         """Get all active sessions for a user (excluding expired)"""
         now = datetime.now()
-        return (
-            db.query(ActiveSession)
-            .filter(
+        result = await db.execute(
+            select(ActiveSession).filter(
                 ActiveSession.user_id == user_id,
                 (ActiveSession.expires_at.is_(None)) | (ActiveSession.expires_at > now),
             )
-            .all()
         )
+        return list(result.scalars().all())
 
     @staticmethod
-    def count_active_sessions_by_user(db: Session, user_id: str, exclude_session_id: str | None = None) -> int:
-        """Count active sessions for a user, optionally excluding a specific session"""
+    async def count_active_sessions_by_user(
+        db: AsyncSession, user_id: str, exclude_session_id: str | None = None, lock_for_update: bool = False
+    ) -> int:
+        """Count active sessions for a user, optionally excluding a specific session.
+
+        Args:
+            db: Database session
+            user_id: User ID to count sessions for
+            exclude_session_id: Optional session ID to exclude from count
+            lock_for_update: If True, use SELECT FOR UPDATE to prevent race conditions
+        """
         now = datetime.now()
-        query = db.query(ActiveSession).filter(
+        query = select(func.count()).select_from(ActiveSession).filter(
             ActiveSession.user_id == user_id,
             (ActiveSession.expires_at.is_(None)) | (ActiveSession.expires_at > now),
         )
@@ -39,11 +49,16 @@ class SessionService:
         if exclude_session_id:
             query = query.filter(ActiveSession.session_id != exclude_session_id)
 
-        return query.count()
+        # Add row-level locking to prevent concurrent insertions
+        if lock_for_update:
+            query = query.with_for_update()
+
+        result = await db.execute(query)
+        return result.scalar() or 0
 
     @staticmethod
-    def create_session(
-        db: Session,
+    async def create_session(
+        db: AsyncSession,
         session_id: str,
         token_id: int,
         user_id: str,
@@ -69,14 +84,16 @@ class SessionService:
         )
 
         db.add(db_session)
-        db.commit()
-        db.refresh(db_session)
+        await db.commit()
+        await db.refresh(db_session)
         return db_session
 
     @staticmethod
-    def update_session_last_check(db: Session, session_id: str, auth_duration: int = 180) -> ActiveSession | None:
+    async def update_session_last_check(
+        db: AsyncSession, session_id: str, auth_duration: int = 180
+    ) -> ActiveSession | None:
         """Update session's last checked timestamp and extend expiration"""
-        db_session = SessionService.get_by_session_id(db, session_id)
+        db_session = await SessionService.get_by_session_id(db, session_id)
         if not db_session:
             return None
 
@@ -84,57 +101,65 @@ class SessionService:
         db_session.last_checked_at = now
         db_session.expires_at = now + timedelta(seconds=auth_duration)
 
-        db.commit()
-        db.refresh(db_session)
+        await db.commit()
+        await db.refresh(db_session)
         return db_session
 
     @staticmethod
-    def delete_session(db: Session, session_id: str) -> bool:
+    async def delete_session(db: AsyncSession, session_id: str) -> bool:
         """Delete a session"""
-        db_session = SessionService.get_by_session_id(db, session_id)
+        db_session = await SessionService.get_by_session_id(db, session_id)
         if not db_session:
             return False
 
-        db.delete(db_session)
-        db.commit()
+        await db.delete(db_session)
+        await db.commit()
         return True
 
     @staticmethod
-    def cleanup_expired_sessions(db: Session) -> int:
+    async def cleanup_expired_sessions(db: AsyncSession) -> int:
         """Delete all expired sessions and return count deleted"""
         now = datetime.now()
-        expired = db.query(ActiveSession).filter(
+
+        # First count the expired sessions
+        count_query = select(func.count()).select_from(ActiveSession).filter(
             ActiveSession.expires_at.isnot(None),
             ActiveSession.expires_at < now,
         )
+        result = await db.execute(count_query)
+        count = result.scalar() or 0
 
-        count = expired.count()
-        expired.delete(synchronize_session=False)
-        db.commit()
+        # Delete expired sessions
+        delete_query = delete(ActiveSession).filter(
+            ActiveSession.expires_at.isnot(None),
+            ActiveSession.expires_at < now,
+        )
+        await db.execute(delete_query)
+        await db.commit()
 
         return count
 
     @staticmethod
-    def list_sessions(
-        db: Session,
+    async def list_sessions(
+        db: AsyncSession,
         user_id: str | None = None,
         skip: int = 0,
         limit: int = 100,
     ) -> list[ActiveSession]:
         """List active sessions with optional user filtering"""
-        query = db.query(ActiveSession)
+        query = select(ActiveSession)
 
         if user_id:
             query = query.filter(ActiveSession.user_id == user_id)
 
-        return query.order_by(ActiveSession.started_at.desc()).offset(skip).limit(limit).all()
+        query = query.order_by(ActiveSession.started_at.desc()).offset(skip).limit(limit)
+        result = await db.execute(query)
+        return list(result.scalars().all())
 
     @staticmethod
-    def get_oldest_session_for_user(db: Session, user_id: str) -> ActiveSession | None:
+    async def get_oldest_session_for_user(db: AsyncSession, user_id: str) -> ActiveSession | None:
         """Get the oldest session for a user (for potential termination)"""
-        return (
-            db.query(ActiveSession)
-            .filter(ActiveSession.user_id == user_id)
-            .order_by(ActiveSession.started_at.asc())
-            .first()
+        result = await db.execute(
+            select(ActiveSession).filter(ActiveSession.user_id == user_id).order_by(ActiveSession.started_at.asc())
         )
+        return result.scalar_one_or_none()
