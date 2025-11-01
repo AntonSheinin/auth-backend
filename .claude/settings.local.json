@@ -4,7 +4,8 @@
       "Bash(mkdir:*)",
       "Bash(git init:*)",
       "Bash(uv pip install:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(dir /s /b \"d:\\Private\\Python\\auth-backend\")"
     ],
     "deny": [],
     "ask": []

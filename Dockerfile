@@ -12,7 +12,7 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 WORKDIR /app
 
 # Copy application code first (required for editable install)
-COPY pyproject.toml ./
+COPY pyproject.toml README.md ./
 COPY ./app ./app
 
 # Install dependencies with editable install

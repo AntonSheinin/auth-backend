@@ -9,6 +9,7 @@ from sqlalchemy import DateTime, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
 
+from app.enums import TokenStatus
 from app.services.database import Base
 
 logger = logging.getLogger(__name__)
@@ -22,7 +23,7 @@ class Token(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     token: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
     user_id: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
-    status: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, index=True, default=TokenStatus.ACTIVE.value)
     max_sessions: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     valid_from: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=func.now())
     valid_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

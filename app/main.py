@@ -6,12 +6,17 @@ import uvicorn
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, status
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from pydantic import ValidationError
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.config import get_settings
+from app.exceptions import AuthBackendError, DatabaseError
 from app.logging import setup_logging
 from app.routes import auth_router, management_router
+from app.schemas.auth import ErrorResponse
 from app.services.database import AsyncSessionLocal, init_db
 from app.services.session_service import SessionService
 
@@ -75,6 +80,114 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
 )
+
+
+# ============================================================================
+# EXCEPTION HANDLERS
+# ============================================================================
+
+
+@app.exception_handler(AuthBackendError)
+async def auth_backend_error_handler(request: Request, exc: AuthBackendError) -> JSONResponse:
+    """Handle custom application errors.
+
+    Args:
+        request: FastAPI request
+        exc: Custom exception
+
+    Returns:
+        JSON response with error details
+    """
+    logger.error(
+        f"Application error: {exc.message}",
+        extra={"error_details": exc.details, "path": request.url.path},
+    )
+    return JSONResponse(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        content=ErrorResponse(
+            error=type(exc).__name__,
+            message=exc.message,
+            details=exc.details,
+        ).model_dump(),
+    )
+
+
+@app.exception_handler(DatabaseError)
+async def database_error_handler(request: Request, exc: DatabaseError) -> JSONResponse:
+    """Handle database errors.
+
+    Args:
+        request: FastAPI request
+        exc: Database error
+
+    Returns:
+        JSON response with error message
+    """
+    logger.error(
+        f"Database error: {exc.message}",
+        extra={"error_details": exc.details, "path": request.url.path},
+        exc_info=True,
+    )
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content=ErrorResponse(
+            error="DatabaseError",
+            message="A database error occurred",
+            details=None,  # Don't expose internal details
+        ).model_dump(),
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_error_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    """Handle Pydantic validation errors.
+
+    Args:
+        request: FastAPI request
+        exc: Validation error
+
+    Returns:
+        JSON response with validation errors
+    """
+    logger.warning(
+        f"Validation error: {exc}",
+        extra={"path": request.url.path, "errors": exc.errors()},
+    )
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content=ErrorResponse(
+            error="ValidationError",
+            message="Request validation failed",
+            details={"errors": exc.errors()},
+        ).model_dump(),
+    )
+
+
+@app.exception_handler(Exception)
+async def general_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Handle unexpected exceptions.
+
+    Args:
+        request: FastAPI request
+        exc: Unexpected exception
+
+    Returns:
+        JSON response with generic error message
+    """
+    logger.error(
+        f"Unexpected error: {exc}",
+        extra={"path": request.url.path},
+        exc_info=True,
+    )
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content=ErrorResponse(
+            error="InternalServerError",
+            message="An unexpected error occurred",
+            details=None,
+        ).model_dump(),
+    )
+
 
 # Include routers
 app.include_router(auth_router)

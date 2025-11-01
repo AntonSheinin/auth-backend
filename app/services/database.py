@@ -31,12 +31,32 @@ def _get_async_database_url(url: str) -> str:
 
 async_database_url = _get_async_database_url(settings.database_url)
 
-# Create async SQLAlchemy engine
-engine = create_async_engine(
-    async_database_url,
-    echo=settings.log_level == "DEBUG",
-    pool_pre_ping=True,
-)
+# Determine if using SQLite (connection pooling works differently)
+is_sqlite = "sqlite" in async_database_url
+
+# Create async SQLAlchemy engine with connection pooling
+if is_sqlite:
+    # SQLite doesn't support traditional pooling - use StaticPool for multi-threaded async
+    from sqlalchemy.pool import StaticPool
+
+    engine = create_async_engine(
+        async_database_url,
+        echo=settings.log_level == "DEBUG",
+        pool_pre_ping=True,
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+else:
+    # PostgreSQL/MySQL - use QueuePool with configured settings
+    engine = create_async_engine(
+        async_database_url,
+        echo=settings.log_level == "DEBUG",
+        pool_pre_ping=True,
+        pool_size=settings.db_pool_size,
+        max_overflow=settings.db_max_overflow,
+        pool_timeout=settings.db_pool_timeout,
+        pool_recycle=3600,  # Recycle connections after 1 hour
+    )
 
 
 # Enable foreign key constraints for SQLite
