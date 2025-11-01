@@ -65,7 +65,7 @@ def verify_api_key(
 async def authorize(
     name: Annotated[str, Query(description="Stream name", min_length=1, max_length=255)],
     ip: Annotated[str, Query(description="Client IP address", min_length=1, max_length=45)],
-    token: Annotated[str, Query(description="Authorization token", min_length=8, max_length=255)],
+    token: Annotated[str, Query(description="Authorization token", min_length=1, max_length=255)],
     proto: Annotated[str, Query(description="Protocol (hls, rtmp, rtsp, etc.)", max_length=20)] = "unknown",
     db: AsyncSession = Depends(get_db),
     settings: Settings = Depends(get_settings_dependency),

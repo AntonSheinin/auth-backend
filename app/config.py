@@ -83,7 +83,7 @@ class Settings(BaseSettings):
         description="API host binding",
     )
     api_port: int = Field(
-        default=8080,
+        default=8090,
         ge=1024,
         le=65535,
         description="API port",

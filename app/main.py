@@ -205,7 +205,7 @@ async def root() -> dict[str, str | dict[str, str]]:
             "docs": "/docs",
             "redoc": "/redoc",
             "health": "/health",
-            "auth": "/auth",
+            "check": "/check",
             "management": "/api",
         },
     }

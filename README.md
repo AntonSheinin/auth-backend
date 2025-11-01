@@ -22,7 +22,7 @@ A standalone FastAPI authentication backend for Flussonic Media Server with SQLi
 docker-compose up -d
 ```
 
-The service will be available on http://localhost:8080
+The service will be available on http://localhost:8090
 
 ### Local Development
 
@@ -48,7 +48,7 @@ python -m app.main
 
 Or with uvicorn directly:
 ```bash
-python -m uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8090 --reload
 ```
 
 ## Configuration
@@ -72,7 +72,7 @@ All variables have sensible defaults (see `.env.example` for detailed documentat
 | `LOG_LEVEL` | `INFO` | Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL) |
 | `ENABLE_ACCESS_LOGS` | `true` | Log authentication attempts to database |
 | `API_HOST` | `0.0.0.0` | IP address to bind the API server |
-| `API_PORT` | `8080` | Port for the API server |
+| `API_PORT` | `8090` | Port for the API server |
 | `API_KEY` | `` (empty) | Optional API key for management endpoints |
 
 ## Flussonic Configuration
@@ -81,7 +81,7 @@ Add to `/etc/flussonic/flussonic.conf`:
 
 ```
 auth_backend myauth {
-  backend http://your-server:8080/auth;
+  backend http://your-server:8090/auth;
 }
 
 stream mystream {
@@ -92,7 +92,7 @@ stream mystream {
 
 ## API Documentation
 
-Visit http://localhost:8080/docs for interactive API documentation.
+Visit http://localhost:8090/docs for interactive API documentation.
 
 ### Main Endpoints
 
@@ -133,7 +133,7 @@ sqlite3 data/tokens.db "SELECT * FROM access_logs ORDER BY timestamp DESC LIMIT 
 ### Create a Token
 
 ```bash
-curl -X POST http://localhost:8080/api/tokens \
+curl -X POST http://localhost:8090/api/tokens \
   -H "Content-Type: application/json" \
   -d '{
     "token": "secure-token-123",
@@ -149,7 +149,7 @@ curl -X POST http://localhost:8080/api/tokens \
 ### Test Authorization (Called by Flussonic)
 
 ```bash
-curl -v "http://localhost:8080/auth?name=stream1&ip=192.168.1.100&token=secure-token-123&proto=hls"
+curl -v "http://localhost:8090/auth?name=stream1&ip=192.168.1.100&token=secure-token-123&proto=hls"
 ```
 
 Success response (HTTP 200):
@@ -172,13 +172,13 @@ Failure response (HTTP 403):
 ### List Tokens
 
 ```bash
-curl http://localhost:8080/api/tokens?status=active
+curl http://localhost:8090/api/tokens?status=active
 ```
 
 ### Update Token
 
 ```bash
-curl -X PATCH http://localhost:8080/api/tokens/1 \
+curl -X PATCH http://localhost:8090/api/tokens/1 \
   -H "Content-Type: application/json" \
   -d '{
     "status": "suspended",
@@ -292,7 +292,7 @@ The management endpoints (`/api/tokens`, `/api/sessions`) can be protected with 
 
 3. Include it in management API requests:
    ```bash
-   curl -H "X-API-Key: your-generated-key" http://localhost:8080/api/tokens
+   curl -H "X-API-Key: your-generated-key" http://localhost:8090/api/tokens
    ```
 
 The authorization endpoint (`/auth`) is always publicly accessible (required by Flussonic).
@@ -308,9 +308,9 @@ mkdir -p data
 
 ### Port Already in Use
 
-If port 8080 is already in use, change it in `.env`:
+If port 8090 is already in use, change it in `.env`:
 ```bash
-API_PORT=8081
+API_PORT=8091
 ```
 
 Then run the application with the new port:
@@ -323,7 +323,7 @@ docker-compose up  # Uses .env automatically
 Ensure Flussonic can reach the auth backend:
 - Check firewall rules
 - Verify the URL in Flussonic config matches your deployment
-- Use the health check endpoint: `curl http://localhost:8080/health`
+- Use the health check endpoint: `curl http://localhost:8090/health`
 
 ## License
 
