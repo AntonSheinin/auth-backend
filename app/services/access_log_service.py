@@ -1,12 +1,16 @@
 """Access logging service for authorization attempts."""
 
 import logging
+from datetime import datetime, timedelta
 from typing import Any
 
+from sqlalchemy import delete, func, select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings
 from app.enums import AccessResult
+from app.exceptions import DatabaseError
 from app.models.log import AccessLog
 
 logger = logging.getLogger(__name__)
@@ -107,3 +111,38 @@ class AccessLogService:
         except Exception as e:
             logger.error(f"Failed to commit access log: {e}", exc_info=True)
             await db.rollback()
+
+    @staticmethod
+    async def cleanup_old_logs(db: AsyncSession, retention_days: int) -> int:
+        """Delete access logs older than retention_days.
+
+        Args:
+            db: Database session
+            retention_days: Number of days to retain logs
+
+        Returns:
+            Number of logs deleted
+
+        Raises:
+            DatabaseError: If database operation fails
+
+        Note:
+            This method DOES commit the transaction (used by background task).
+        """
+        try:
+            cutoff_date = datetime.now() - timedelta(days=retention_days)
+
+            # First count how many logs will be deleted
+            count_query = select(func.count()).select_from(AccessLog).filter(AccessLog.timestamp < cutoff_date)
+            count_result = await db.execute(count_query)
+            count = count_result.scalar() or 0
+
+            # Delete old logs using bulk delete
+            delete_query = delete(AccessLog).filter(AccessLog.timestamp < cutoff_date)
+            await db.execute(delete_query)
+            await db.commit()
+
+            return count
+        except SQLAlchemyError as e:
+            await db.rollback()
+            raise DatabaseError("cleanup_old_logs", e) from e

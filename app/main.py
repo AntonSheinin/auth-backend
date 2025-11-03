@@ -17,6 +17,7 @@ from app.exceptions import AuthBackendError, DatabaseError
 from app.logging import setup_logging
 from app.routes import auth_router, management_router
 from app.schemas.auth import ErrorResponse
+from app.services.access_log_service import AccessLogService
 from app.services.database import AsyncSessionLocal, init_db
 from app.services.session_service import SessionService
 
@@ -32,11 +33,13 @@ async def cleanup_expired_sessions_task() -> None:
         try:
             await asyncio.sleep(settings.session_cleanup_interval)
 
+            logger.info("Session cleanup task started")
             async with AsyncSessionLocal() as db:
                 try:
-                    count = await SessionService.cleanup_expired_sessions(db)
-                    if count > 0:
-                        logger.info(f"Cleaned up {count} expired sessions")
+                    # Cleanup expired sessions
+                    session_count = await SessionService.cleanup_expired_sessions(db)
+                    logger.info(f"Session cleanup task completed: deleted {session_count} expired session(s)")
+
                 except SQLAlchemyError as e:
                     logger.error(f"Database error during session cleanup: {e}", exc_info=True)
 
@@ -44,7 +47,32 @@ async def cleanup_expired_sessions_task() -> None:
             logger.info("Session cleanup task cancelled")
             raise
         except Exception as e:
-            logger.error(f"Unexpected error in cleanup task: {e}", exc_info=True)
+            logger.error(f"Unexpected error in session cleanup task: {e}", exc_info=True)
+
+
+async def cleanup_old_logs_task() -> None:
+    """Background task to periodically clean up old access logs."""
+    while True:
+        try:
+            await asyncio.sleep(settings.log_cleanup_interval)
+
+            if settings.enable_access_logs:
+                logger.info(f"Log cleanup task started (retention: {settings.log_retention_days} days)")
+                async with AsyncSessionLocal() as db:
+                    try:
+                        log_count = await AccessLogService.cleanup_old_logs(db, settings.log_retention_days)
+                        logger.info(f"Log cleanup task completed: deleted {log_count} old log(s)")
+
+                    except SQLAlchemyError as e:
+                        logger.error(f"Database error during log cleanup: {e}", exc_info=True)
+            else:
+                logger.debug("Log cleanup task skipped (access logs disabled)")
+
+        except asyncio.CancelledError:
+            logger.info("Log cleanup task cancelled")
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error in log cleanup task: {e}", exc_info=True)
 
 
 @asynccontextmanager
@@ -55,20 +83,26 @@ async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:
     await init_db()
     logger.info(f"Server starting on {settings.api_host}:{settings.api_port}")
 
-    # Start background cleanup task
-    cleanup_task = asyncio.create_task(cleanup_expired_sessions_task())
-    logger.info("Background cleanup task started")
+    # Start background cleanup tasks
+    session_cleanup_task = asyncio.create_task(cleanup_expired_sessions_task())
+    log_cleanup_task = asyncio.create_task(cleanup_old_logs_task())
+    logger.info("Background cleanup tasks started")
 
     yield
 
     # Shutdown
     logger.info("Shutting down Flussonic Auth Backend...")
-    cleanup_task.cancel()
+    session_cleanup_task.cancel()
+    log_cleanup_task.cancel()
     try:
-        await cleanup_task
+        await session_cleanup_task
     except asyncio.CancelledError:
         pass
-    logger.info("Cleanup task stopped")
+    try:
+        await log_cleanup_task
+    except asyncio.CancelledError:
+        pass
+    logger.info("Cleanup tasks stopped")
 
 
 # Create FastAPI app

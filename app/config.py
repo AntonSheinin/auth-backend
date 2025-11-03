@@ -76,6 +76,18 @@ class Settings(BaseSettings):
         default=True,
         description="Enable access logging to database",
     )
+    log_retention_days: int = Field(
+        default=3,
+        ge=1,
+        le=365,
+        description="Number of days to retain access logs in database",
+    )
+    log_cleanup_interval: int = Field(
+        default=3600,
+        ge=60,
+        le=86400,
+        description="How often to cleanup old logs in seconds (default: 3600 = 1 hour)",
+    )
 
     # API settings
     api_host: str = Field(
