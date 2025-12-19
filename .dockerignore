@@ -6,6 +6,7 @@ __pycache__/
 .Python
 env/
 venv/
+.venv/
 ENV/
 build/
 develop-eggs/
@@ -29,6 +30,10 @@ wheels/
 *.swp
 *.swo
 *~
+.vs/
+
+# Claude Code
+.claude/
 
 # OS
 .DS_Store
