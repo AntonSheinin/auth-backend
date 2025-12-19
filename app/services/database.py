@@ -36,15 +36,14 @@ is_sqlite = "sqlite" in async_database_url
 
 # Create async SQLAlchemy engine with connection pooling
 if is_sqlite:
-    # SQLite doesn't support traditional pooling - use StaticPool for multi-threaded async
-    from sqlalchemy.pool import StaticPool
+    # SQLite - use NullPool to avoid connection conflicts
+    from sqlalchemy.pool import NullPool
 
     engine = create_async_engine(
         async_database_url,
         echo=settings.log_level == "DEBUG",
-        pool_pre_ping=True,
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
+        connect_args={"check_same_thread": False, "timeout": 30},
+        poolclass=NullPool,
     )
 else:
     # PostgreSQL/MySQL - use QueuePool with configured settings
