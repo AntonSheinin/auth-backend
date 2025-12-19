@@ -61,7 +61,7 @@ class DeniedResponse(BaseModel):
     reason: str = Field(
         ...,
         description="Denial reason: token_not_found, token_suspended, token_expired, "
-        "max_sessions_reached, ip_not_allowed, stream_not_allowed",
+        "token_invalid_status, token_not_yet_valid, max_sessions_reached, ip_not_allowed, stream_not_allowed",
     )
     message: str = Field(..., description="Human-readable error message")
     user_id: str | None = Field(None, description="User ID if token was found")

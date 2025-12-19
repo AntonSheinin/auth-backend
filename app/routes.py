@@ -131,6 +131,7 @@ async def authorize(
             "token_not_found": "Invalid or unknown token",
             "token_suspended": "Token has been suspended",
             "token_expired": "Token has expired",
+            "token_invalid_status": "Token has an invalid status",
             "token_not_yet_valid": "Token is not yet valid",
             "max_sessions_reached": f"Maximum concurrent sessions limit reached ({token_obj.max_sessions if token_obj else 'N/A'})",
             "ip_not_allowed": f"IP address {ip} is not authorized for this token",

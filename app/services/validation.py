@@ -64,22 +64,22 @@ class ValidationService:
                 await db.commit()
                 return False, "token_not_found", None
 
-            # 2. Check token status
-            if token_obj.status == TokenStatus.SUSPENDED.value:
-                await AccessLogService.log_access(
-                    db, token, token_obj.user_id, stream_name, client_ip, protocol,
-                    AccessResult.DENIED, "token_suspended", settings
-                )
-                await db.commit()
-                return False, "token_suspended", token_obj
+            # 2. Check token status - must be explicitly ACTIVE
+            if token_obj.status != TokenStatus.ACTIVE.value:
+                # Determine specific denial reason based on status
+                if token_obj.status == TokenStatus.SUSPENDED.value:
+                    denial_reason = "token_suspended"
+                elif token_obj.status == TokenStatus.EXPIRED.value:
+                    denial_reason = "token_expired"
+                else:
+                    denial_reason = "token_invalid_status"
 
-            if token_obj.status == TokenStatus.EXPIRED.value:
                 await AccessLogService.log_access(
                     db, token, token_obj.user_id, stream_name, client_ip, protocol,
-                    AccessResult.DENIED, "token_expired", settings
+                    AccessResult.DENIED, denial_reason, settings
                 )
                 await db.commit()
-                return False, "token_expired", token_obj
+                return False, denial_reason, token_obj
 
             # 3. Check validity period
             now = datetime.now()
@@ -127,6 +127,8 @@ class ValidationService:
 
             if existing_session:
                 # This is a re-check (Flussonic checks every 3 minutes)
+                # Token status has already been validated above (suspended/expired checks)
+                # so we can safely extend the session
                 await SessionService.update_session_last_check(db, session_id, settings.auth_duration)
                 await AccessLogService.log_access(
                     db, token, token_obj.user_id, stream_name, client_ip, protocol,
