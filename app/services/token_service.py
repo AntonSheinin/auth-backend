@@ -1,5 +1,6 @@
 """Token service for database operations."""
 
+import logging
 from datetime import datetime
 from typing import Any
 
@@ -10,6 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.enums import TokenStatus
 from app.exceptions import DatabaseError, TokenNotFoundError
 from app.models.token import Token
+
+logger = logging.getLogger(__name__)
 
 
 class TokenService:
@@ -34,8 +37,14 @@ class TokenService:
             DatabaseError: If database operation fails
         """
         try:
+            # Expire all to ensure fresh data from database
+            db.expire_all()
             result = await db.execute(select(Token).filter(Token.token == token))
-            return result.scalar_one_or_none()
+            token_obj = result.scalar_one_or_none()
+            # Refresh to get latest data from DB
+            if token_obj:
+                await db.refresh(token_obj)
+            return token_obj
         except SQLAlchemyError as e:
             raise DatabaseError("get_by_token", e) from e
 
@@ -54,8 +63,13 @@ class TokenService:
             DatabaseError: If database operation fails
         """
         try:
+            # Expire all to ensure fresh data from database
+            db.expire_all()
             result = await db.execute(select(Token).filter(Token.id == token_id))
-            return result.scalar_one_or_none()
+            token_obj = result.scalar_one_or_none()
+            if token_obj:
+                await db.refresh(token_obj)
+            return token_obj
         except SQLAlchemyError as e:
             raise DatabaseError("get_by_id", e) from e
 
@@ -172,14 +186,21 @@ class TokenService:
                         db_token.set_allowed_streams(value)
                     elif key == "meta" and isinstance(value, dict):
                         db_token.set_meta(value)
-                    elif key == "status" and isinstance(value, TokenStatus):
-                        db_token.status = value.value
+                    elif key == "status":
+                        # Handle both TokenStatus enum and string values
+                        if isinstance(value, TokenStatus):
+                            new_status = value.value
+                        else:
+                            new_status = str(value)
+                        logger.info(f"Updating token {token_id} status: '{db_token.status}' -> '{new_status}'")
+                        db_token.status = new_status
                     elif hasattr(db_token, key):
                         setattr(db_token, key, value)
 
             db_token.updated_at = datetime.now()
             await db.flush()
             await db.refresh(db_token)
+            logger.info(f"Token {token_id} updated, final status: '{db_token.status}'")
             return db_token
         except TokenNotFoundError:
             raise

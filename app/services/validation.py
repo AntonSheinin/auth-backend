@@ -65,6 +65,7 @@ class ValidationService:
                 return False, "token_not_found", None
 
             # 2. Check token status - must be explicitly ACTIVE
+            logger.info(f"Token status check: token_id={token_obj.id}, status='{token_obj.status}', expected_active='{TokenStatus.ACTIVE.value}'")
             if token_obj.status != TokenStatus.ACTIVE.value:
                 # Determine specific denial reason based on status
                 if token_obj.status == TokenStatus.SUSPENDED.value:
@@ -74,6 +75,7 @@ class ValidationService:
                 else:
                     denial_reason = "token_invalid_status"
 
+                logger.warning(f"Token denied: status='{token_obj.status}', reason={denial_reason}")
                 await AccessLogService.log_access(
                     db, token, token_obj.user_id, stream_name, client_ip, protocol,
                     AccessResult.DENIED, denial_reason, settings
