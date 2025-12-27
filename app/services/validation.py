@@ -144,7 +144,25 @@ class ValidationService:
                 active_sessions = await SessionService.get_active_sessions_for_update(
                     db, token_obj.user_id, exclude_session_id=session_id
                 )
-                active_count = len(active_sessions)
+
+                # Check if this is a channel switch (same token+IP, different stream)
+                # In IPTV, when user switches channel, old session should be replaced
+                sessions_from_same_source = [
+                    s for s in active_sessions
+                    if s.client_ip == client_ip and s.token_id == token_obj.id
+                ]
+
+                # Remove old sessions from the same source (token+IP) to allow channel switching
+                for old_session in sessions_from_same_source:
+                    logger.info(
+                        f"Channel switch detected: replacing session for stream '{old_session.stream_name}' "
+                        f"with new stream '{stream_name}' (user={token_obj.user_id}, ip={client_ip})"
+                    )
+                    await SessionService.delete_session_by_id(db, old_session.id)
+
+                # Recalculate active sessions after removing switched sessions
+                remaining_sessions = [s for s in active_sessions if s not in sessions_from_same_source]
+                active_count = len(remaining_sessions)
 
                 if active_count >= token_obj.max_sessions:
                     await AccessLogService.log_access(

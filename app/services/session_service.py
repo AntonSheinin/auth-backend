@@ -201,7 +201,7 @@ class SessionService:
 
     @staticmethod
     async def delete_session(db: AsyncSession, session_id: str) -> None:
-        """Delete a session.
+        """Delete a session by session_id string.
 
         Args:
             db: Database session
@@ -225,6 +225,31 @@ class SessionService:
             raise
         except SQLAlchemyError as e:
             raise DatabaseError("delete_session", e) from e
+
+    @staticmethod
+    async def delete_session_by_id(db: AsyncSession, session_db_id: int) -> None:
+        """Delete a session by database ID.
+
+        Args:
+            db: Database session
+            session_db_id: Database ID of the session to delete
+
+        Raises:
+            DatabaseError: If database operation fails
+
+        Note:
+            This method does NOT commit. Caller must commit the transaction.
+        """
+        try:
+            result = await db.execute(
+                select(ActiveSession).filter(ActiveSession.id == session_db_id)
+            )
+            db_session = result.scalar_one_or_none()
+            if db_session:
+                await db.delete(db_session)
+                await db.flush()
+        except SQLAlchemyError as e:
+            raise DatabaseError("delete_session_by_id", e) from e
 
     @staticmethod
     async def cleanup_expired_sessions(db: AsyncSession) -> int:

@@ -5,7 +5,12 @@
       "Bash(git init:*)",
       "Bash(uv pip install:*)",
       "Bash(git add:*)",
-      "Bash(dir /s /b \"d:\\Private\\Python\\auth-backend\")"
+      "Bash(dir /s /b \"d:\\Private\\Python\\auth-backend\")",
+      "Bash(python:*)",
+      "Bash(.venvScriptspython -c \"\nimport asyncio\nfrom sqlalchemy import select\nfrom app.services.database import AsyncSessionLocal\nfrom app.models.token import Token\nfrom app.enums import TokenStatus\n\nasync def check_token\\(\\):\n    async with AsyncSessionLocal\\(\\) as db:\n        db.expire_all\\(\\)\n        result = await db.execute\\(select\\(Token\\).filter\\(Token.token == ''GUYWFz-dNAblpppqptxwWNgIPp8xYekgzVqGGU4FatE''\\)\\)\n        token = result.scalar_one_or_none\\(\\)\n        if token:\n            await db.refresh\\(token\\)\n            print\\(f''Token found: id={token.id}, status={repr\\(token.status\\)}''\\)\n            print\\(f''ACTIVE value: {repr\\(TokenStatus.ACTIVE.value\\)}''\\)\n            print\\(f''Is NOT active: {token.status != TokenStatus.ACTIVE.value}''\\)\n            print\\(f''Is SUSPENDED: {token.status == TokenStatus.SUSPENDED.value}''\\)\n        else:\n            print\\(''Token not found''\\)\n\nasyncio.run\\(check_token\\(\\)\\)\n\")",
+      "Bash(\".venv\\\\Scripts\\\\python.exe\":*)",
+      "Bash(curl:*)",
+      "Bash(__NEW_LINE__ echo \"\")"
     ],
     "deny": [],
     "ask": []
