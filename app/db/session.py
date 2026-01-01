@@ -43,17 +43,14 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 
 
 async def init_db() -> None:
-    """Initialize database - create all tables asynchronously.
+    """Initialize database connection.
 
-    This imports all models to register them with Base.metadata,
-    then creates all tables that don't exist.
+    Note: Table creation is handled by Alembic migrations.
+    Run 'alembic upgrade head' to create/update tables.
     """
-    # Import models to register them with Base
+    # Import models to register them with Base.metadata
     from app.models.log import AccessLog  # noqa: F401
     from app.models.session import ActiveSession  # noqa: F401
     from app.models.token import Token  # noqa: F401
 
-    logger.info("Creating database tables...")
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    logger.info("Database tables created successfully")
+    logger.info("Database initialized (tables managed by Alembic migrations)")
