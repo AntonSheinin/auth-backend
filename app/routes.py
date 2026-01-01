@@ -12,7 +12,7 @@ from app.exceptions import DatabaseError, SessionNotFoundError, TokenAlreadyExis
 from app.mappers import TokenMapper
 from app.schemas.auth import DeniedResponse
 from app.schemas.management import SessionResponse, TokenCreate, TokenResponse, TokenUpdate
-from app.services.database import get_db
+from app.db import get_db
 from app.services.session_service import SessionService
 from app.services.token_service import TokenService
 from app.services.validation import ValidationService

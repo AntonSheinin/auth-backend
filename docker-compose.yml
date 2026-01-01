@@ -1,16 +1,32 @@
 version: '3.8'
 
 services:
+  db:
+    image: postgres:16-alpine
+    container_name: auth-backend-db
+    environment:
+      POSTGRES_USER: auth_user
+      POSTGRES_PASSWORD: auth_password
+      POSTGRES_DB: auth_backend
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U auth_user -d auth_backend"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
   auth-backend:
     build: .
     container_name: flussonic-auth-backend
     ports:
       - "8090:8090"
-    volumes:
-      - ./data:/app/data          # Persist SQLite database
-      - ./app:/app/app            # For development hot-reload (optional)
     environment:
-      - DATABASE_URL=sqlite:///./data/tokens.db
+      - DATABASE_URL=postgresql://auth_user:auth_password@db:5432/auth_backend
       - AUTH_DURATION=180
       - SESSION_CLEANUP_INTERVAL=60
       - LOG_LEVEL=INFO
@@ -19,8 +35,15 @@ services:
       - LOG_CLEANUP_INTERVAL=3600
       - API_HOST=0.0.0.0
       - API_PORT=8090
+      # Database pool settings
+      - DB_POOL_SIZE=5
+      - DB_MAX_OVERFLOW=10
+      - DB_POOL_TIMEOUT=30
       # Optional: Set API key for management endpoints
       # - API_KEY=your-secret-api-key
+    depends_on:
+      db:
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8090/health')"]
@@ -28,3 +51,6 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+
+volumes:
+  postgres_data:

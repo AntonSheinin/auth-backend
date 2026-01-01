@@ -1,0 +1,32 @@
+version: '3.8'
+
+# Development compose file - uses SQLite for simplicity
+# Usage: docker-compose -f docker-compose.dev.yml up
+
+services:
+  auth-backend:
+    build: .
+    container_name: flussonic-auth-backend-dev
+    ports:
+      - "8090:8090"
+    volumes:
+      - ./data:/app/data          # Persist SQLite database
+      - ./app:/app/app            # For development hot-reload
+      - ./alembic:/app/alembic    # For migrations
+    environment:
+      - DATABASE_URL=sqlite:///./data/tokens.db
+      - AUTH_DURATION=180
+      - SESSION_CLEANUP_INTERVAL=60
+      - LOG_LEVEL=DEBUG
+      - ENABLE_ACCESS_LOGS=true
+      - LOG_RETENTION_DAYS=3
+      - LOG_CLEANUP_INTERVAL=3600
+      - API_HOST=0.0.0.0
+      - API_PORT=8090
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8090/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

@@ -16,10 +16,10 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # Database
+    # Database - defaults to PostgreSQL for production, override with sqlite for dev
     database_url: str = Field(
-        default="sqlite:///./data/tokens.db",
-        description="Database connection URL",
+        default="postgresql://auth_user:auth_password@db:5432/auth_backend",
+        description="Database connection URL (postgresql://, sqlite://, mysql://)",
     )
     db_pool_size: int = Field(
         default=5,

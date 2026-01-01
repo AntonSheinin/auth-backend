@@ -9,8 +9,8 @@ from sqlalchemy import DateTime, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
 
+from app.db import Base
 from app.enums import TokenStatus
-from app.services.database import Base
 
 logger = logging.getLogger(__name__)
 

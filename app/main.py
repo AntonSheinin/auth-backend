@@ -18,7 +18,7 @@ from app.logging import setup_logging
 from app.routes import auth_router, management_router
 from app.schemas.auth import ErrorResponse
 from app.services.access_log_service import AccessLogService
-from app.services.database import AsyncSessionLocal, init_db
+from app.db import AsyncSessionLocal, init_db
 from app.services.session_service import SessionService
 
 # Setup logging first
