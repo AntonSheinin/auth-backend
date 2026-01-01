@@ -16,10 +16,10 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # Database - defaults to PostgreSQL for production, override with sqlite for dev
+    # Database - PostgreSQL only
     database_url: str = Field(
         default="postgresql://auth_user:auth_password@db:5432/auth_backend",
-        description="Database connection URL (postgresql://, sqlite://, mysql://)",
+        description="PostgreSQL database connection URL",
     )
     db_pool_size: int = Field(
         default=5,
@@ -45,11 +45,8 @@ class Settings(BaseSettings):
     def validate_database_url(cls, v: str) -> str:
         """Validate database URL format."""
         v = v.strip()
-        valid_prefixes = ("sqlite://", "postgresql://", "postgresql+", "mysql://", "mysql+")
-        if not any(v.startswith(prefix) for prefix in valid_prefixes):
-            raise ValueError(
-                f"Invalid database URL. Must start with one of: {', '.join(valid_prefixes)}"
-            )
+        if not v.startswith(("postgresql://", "postgresql+")):
+            raise ValueError("Invalid database URL. Must start with postgresql://")
         return v
 
     # Auth settings

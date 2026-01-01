@@ -19,13 +19,6 @@ COPY ./alembic ./alembic
 # Install dependencies with editable install
 RUN uv pip install --no-cache -e .
 
-# Create data directory (for SQLite if used)
-RUN mkdir -p /app/data
-
-# Copy startup script
-COPY docker-entrypoint.sh /docker-entrypoint.sh
-RUN chmod +x /docker-entrypoint.sh
-
 # Expose port
 EXPOSE 8090
 
@@ -33,6 +26,5 @@ EXPOSE 8090
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8090/health')"
 
-# Run with entrypoint that handles migrations
-ENTRYPOINT ["/docker-entrypoint.sh"]
+# Run uvicorn directly
 CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8090"]
