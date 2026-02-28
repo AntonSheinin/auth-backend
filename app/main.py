@@ -5,20 +5,27 @@ import logging
 import uvicorn
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from datetime import datetime
 
-from fastapi import FastAPI, Request, status
+from fastapi import Depends, FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
+from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
+from app.db import AsyncSessionLocal, get_db, init_db
+from app.enums import TokenStatus
 from app.exceptions import AuthBackendError, DatabaseError
 from app.logging import setup_logging
+from app.models.session import ActiveSession
+from app.models.token import Token
 from app.routes import auth_router, management_router
 from app.schemas.auth import ErrorResponse
+from app.schemas.management import HealthResponse, StatsResponse
 from app.services.access_log_service import AccessLogService
-from app.db import AsyncSessionLocal, init_db
 from app.services.session_service import SessionService
 
 # Setup logging first
@@ -239,16 +246,33 @@ async def root() -> dict[str, str | dict[str, str]]:
             "docs": "/docs",
             "redoc": "/redoc",
             "health": "/health",
+            "stats": "/stats",
             "check": "/check",
             "management": "/api",
         },
     }
 
 
-@app.get("/health", tags=["health"])
-async def health_check() -> dict[str, str]:
+@app.get("/health", tags=["health"], response_model=HealthResponse)
+async def health_check() -> HealthResponse:
     """Health check endpoint for Docker."""
-    return {"status": "healthy"}
+    return HealthResponse(status="healthy")
+
+
+@app.get("/stats", tags=["info"], response_model=StatsResponse)
+async def stats(db: AsyncSession = Depends(get_db)) -> StatsResponse:
+    """Return current counts of active sessions and active tokens."""
+    now = datetime.now()
+
+    sessions_query = select(func.count()).select_from(ActiveSession).filter(
+        (ActiveSession.expires_at.is_(None)) | (ActiveSession.expires_at > now)
+    )
+    tokens_query = select(func.count()).select_from(Token).filter(Token.status == TokenStatus.ACTIVE.value)
+
+    active_sessions = (await db.execute(sessions_query)).scalar() or 0
+    active_tokens = (await db.execute(tokens_query)).scalar() or 0
+
+    return StatsResponse(active_sessions=active_sessions, active_tokens=active_tokens)
 
 
 def main() -> None:

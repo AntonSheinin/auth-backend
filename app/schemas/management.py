@@ -5,7 +5,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.enums import TokenStatus
+from app.enums import AccessResult, TokenStatus
 
 
 class TokenCreate(BaseModel):
@@ -76,3 +76,32 @@ class SessionResponse(BaseModel):
     started_at: datetime
     last_checked_at: datetime
     expires_at: datetime | None
+
+
+class AccessLogResponse(BaseModel):
+    """Schema for access log response."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    timestamp: datetime
+    token: str | None
+    user_id: str | None
+    stream_name: str | None
+    client_ip: str | None
+    protocol: str | None
+    result: AccessResult
+    reason: str | None
+
+
+class HealthResponse(BaseModel):
+    """Schema for health check response."""
+
+    status: str
+
+
+class StatsResponse(BaseModel):
+    """Schema for lightweight service statistics."""
+
+    active_sessions: int
+    active_tokens: int

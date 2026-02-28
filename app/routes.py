@@ -1,18 +1,20 @@
 """All API routes consolidated in one file."""
 
 import logging
+from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings, get_settings
-from app.enums import TokenStatus
+from app.enums import AccessResult, TokenStatus
 from app.exceptions import DatabaseError, SessionNotFoundError, TokenAlreadyExistsError, TokenNotFoundError
 from app.mappers import TokenMapper
 from app.schemas.auth import DeniedResponse
-from app.schemas.management import SessionResponse, TokenCreate, TokenResponse, TokenUpdate
+from app.schemas.management import AccessLogResponse, SessionResponse, TokenCreate, TokenResponse, TokenUpdate
 from app.db import get_db
+from app.services.access_log_service import AccessLogService
 from app.services.session_service import SessionService
 from app.services.token_service import TokenService
 from app.services.validation import ValidationService
@@ -509,4 +511,78 @@ async def cleanup_sessions(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to cleanup sessions",
+        ) from e
+
+
+# ============================================================================
+# MANAGEMENT API - ACCESS LOGS
+# ============================================================================
+
+
+@management_router.get("/access-logs", response_model=list[AccessLogResponse])
+async def list_access_logs(
+    user_id: Annotated[str | None, Query(description="Filter by user ID")] = None,
+    token: Annotated[str | None, Query(description="Filter by token")] = None,
+    stream_name: Annotated[str | None, Query(description="Filter by stream name")] = None,
+    client_ip: Annotated[str | None, Query(description="Filter by client IP")] = None,
+    protocol: Annotated[str | None, Query(description="Filter by protocol")] = None,
+    result: Annotated[AccessResult | None, Query(description="Filter by access result")] = None,
+    reason: Annotated[str | None, Query(description="Filter by result reason")] = None,
+    start_time: Annotated[datetime | None, Query(description="Filter logs from this timestamp (inclusive)")] = None,
+    end_time: Annotated[datetime | None, Query(description="Filter logs until this timestamp (inclusive)")] = None,
+    skip: Annotated[int, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(ge=1, le=1000)] = 100,
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(verify_api_key),
+) -> list[AccessLogResponse]:
+    """List access logs with optional filtering.
+
+    Args:
+        user_id: Optional user ID filter
+        token: Optional token filter
+        stream_name: Optional stream name filter
+        client_ip: Optional client IP filter
+        protocol: Optional protocol filter
+        result: Optional access result filter
+        reason: Optional denial reason filter
+        start_time: Optional start timestamp (inclusive)
+        end_time: Optional end timestamp (inclusive)
+        skip: Number of records to skip
+        limit: Maximum number of records to return
+        db: Database session
+        _: API key verification
+
+    Returns:
+        List of access log entries
+
+    Raises:
+        HTTPException: On invalid time range (400) or database error (500)
+    """
+    if start_time and end_time and start_time > end_time:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="start_time must be before end_time",
+        )
+
+    try:
+        logs = await AccessLogService.list_access_logs(
+            db=db,
+            user_id=user_id,
+            token=token,
+            stream_name=stream_name,
+            client_ip=client_ip,
+            protocol=protocol,
+            result=result,
+            reason=reason,
+            start_time=start_time,
+            end_time=end_time,
+            skip=skip,
+            limit=limit,
+        )
+        return [AccessLogResponse.model_validate(log) for log in logs]
+    except DatabaseError as e:
+        logger.error(f"Database error listing access logs: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to list access logs",
         ) from e

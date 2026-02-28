@@ -146,3 +146,68 @@ class AccessLogService:
         except SQLAlchemyError as e:
             await db.rollback()
             raise DatabaseError("cleanup_old_logs", e) from e
+
+    @staticmethod
+    async def list_access_logs(
+        db: AsyncSession,
+        user_id: str | None = None,
+        token: str | None = None,
+        stream_name: str | None = None,
+        client_ip: str | None = None,
+        protocol: str | None = None,
+        result: AccessResult | None = None,
+        reason: str | None = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> list[AccessLog]:
+        """List access logs with optional filters.
+
+        Args:
+            db: Database session
+            user_id: Optional user identifier filter
+            token: Optional token filter
+            stream_name: Optional stream name filter
+            client_ip: Optional client IP filter
+            protocol: Optional protocol filter
+            result: Optional access result filter
+            reason: Optional reason filter
+            start_time: Optional start timestamp (inclusive)
+            end_time: Optional end timestamp (inclusive)
+            skip: Number of records to skip
+            limit: Maximum number of records to return
+
+        Returns:
+            List of AccessLog models
+
+        Raises:
+            DatabaseError: If database operation fails
+        """
+        try:
+            query = select(AccessLog)
+
+            if user_id:
+                query = query.filter(AccessLog.user_id == user_id)
+            if token:
+                query = query.filter(AccessLog.token == token)
+            if stream_name:
+                query = query.filter(AccessLog.stream_name == stream_name)
+            if client_ip:
+                query = query.filter(AccessLog.client_ip == client_ip)
+            if protocol:
+                query = query.filter(AccessLog.protocol == protocol)
+            if result:
+                query = query.filter(AccessLog.result == result)
+            if reason:
+                query = query.filter(AccessLog.reason == reason)
+            if start_time:
+                query = query.filter(AccessLog.timestamp >= start_time)
+            if end_time:
+                query = query.filter(AccessLog.timestamp <= end_time)
+
+            query = query.order_by(AccessLog.timestamp.desc()).offset(skip).limit(limit)
+            result_proxy = await db.execute(query)
+            return list(result_proxy.scalars().all())
+        except SQLAlchemyError as e:
+            raise DatabaseError("list_access_logs", e) from e

@@ -177,6 +177,14 @@ Headers:
 | `/api/sessions/{id}` | DELETE | Terminate specific session |
 | `/api/sessions/cleanup` | POST | Manually trigger expired session cleanup |
 
+### Access Logs API (Protected*)
+
+*Requires `X-API-Key` header if `API_KEY` is configured.
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/access-logs` | GET | Query access logs (supports `user_id`, `token`, `stream_name`, `client_ip`, `protocol`, `result`, `reason`, `start_time`, `end_time`, `skip`, `limit`) |
+
 ## Flussonic Configuration
 
 Add to `/etc/flussonic/flussonic.conf`:
@@ -252,7 +260,14 @@ curl -X DELETE -H "X-API-Key: your-api-key" \
   http://localhost:8090/api/sessions/123
 ```
 
-### Query Access Logs
+### Query Access Logs (API)
+
+```bash
+curl -H "X-API-Key: your-api-key" \
+  "http://localhost:8090/api/access-logs?user_id=user-001&start_time=2024-01-01T00:00:00&end_time=2024-01-31T23:59:59"
+```
+
+### Query Access Logs (DB)
 
 ```bash
 sqlite3 data/tokens.db \

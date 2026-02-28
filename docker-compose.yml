@@ -9,7 +9,7 @@ services:
       POSTGRES_PASSWORD: auth_password
       POSTGRES_DB: auth_backend
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - ./data/postgres:/var/lib/postgresql/data
     ports:
       - "5433:5432"  # Use 5433 externally to avoid conflict with local PostgreSQL
     restart: unless-stopped
@@ -52,5 +52,3 @@ services:
       retries: 3
       start_period: 10s
 
-volumes:
-  postgres_data:

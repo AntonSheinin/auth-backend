@@ -15,7 +15,8 @@
       "Bash(\".venv\\\\Scripts\\\\python.exe\" -c \"\nfrom app.db import Base, get_db, init_db, AsyncSessionLocal\nfrom app.db.engine import create_db_engine\nfrom app.models.token import Token\nfrom app.models.session import ActiveSession\nfrom app.models.log import AccessLog\nprint\\(''All imports successful!''\\)\nprint\\(f''Tables: {list\\(Base.metadata.tables.keys\\(\\)\\)}''\\)\n\")",
       "Bash(git commit -m \"$\\(cat <<''EOF''\nRefactor database layer for PostgreSQL support with multi-DB flexibility\n\nMajor changes:\n- Created app/db/ package with separated base, engine, session modules\n- Added Alembic migrations support for schema versioning\n- Updated docker-compose.yml to use PostgreSQL 16 as primary database\n- Added docker-compose.dev.yml for SQLite-based development\n- Added docker-entrypoint.sh to run migrations on startup\n\nArchitecture improvements:\n- Isolated Base class to prevent circular imports \\(SOLID - SRP\\)\n- Engine factory supports SQLite/PostgreSQL/MySQL \\(SOLID - OCP\\)\n- Services depend on abstract AsyncSession \\(SOLID - DIP\\)\n- Clean module separation without over-engineering\n\nFiles:\n- NEW: app/db/__init__.py, base.py, engine.py, session.py\n- NEW: alembic.ini, alembic/env.py, alembic/versions/\n- NEW: docker-compose.dev.yml, docker-entrypoint.sh\n- REMOVED: app/services/database.py \\(split into app/db/\\)\n- UPDATED: All models and services to use new db imports\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
       "Bash(git push)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(docker-compose:*)"
     ],
     "deny": [],
     "ask": []
