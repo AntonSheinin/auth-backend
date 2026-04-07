@@ -67,7 +67,7 @@ def verify_api_key(
 async def authorize(
     name: Annotated[str, Query(description="Stream name", min_length=1, max_length=255)],
     ip: Annotated[str, Query(description="Client IP address", min_length=1, max_length=45)],
-    token: Annotated[str, Query(description="Authorization token", min_length=1, max_length=255)],
+    token: Annotated[str | None, Query(description="Authorization token", max_length=255)] = None,
     proto: Annotated[str, Query(description="Protocol (hls, rtmp, rtsp, etc.)", max_length=20)] = "unknown",
     db: AsyncSession = Depends(get_db),
     settings: Settings = Depends(get_settings_dependency),
@@ -100,6 +100,21 @@ async def authorize(
     Raises:
         HTTPException: On internal errors (500)
     """
+    if not token or not token.strip():
+        logger.warning(f"Access DENIED: reason=missing_token, stream={name}, ip={ip}")
+        error_response = DeniedResponse(
+            error="access_denied",
+            reason="missing_token",
+            message="Missing token query parameter",
+            user_id=None,
+        )
+        return Response(
+            content=error_response.model_dump_json(),
+            status_code=status.HTTP_403_FORBIDDEN,
+            media_type="application/json",
+        )
+
+    token = token.strip()
     # Mask token in logs for security
     token_preview = token[:8] + "..." if len(token) > 8 else token
     logger.info(f"Auth request: stream={name}, ip={ip}, token={token_preview}, proto={proto}")
@@ -131,6 +146,7 @@ async def authorize(
 
         error_messages = {
             "token_not_found": "Invalid or unknown token",
+            "missing_token": "Missing token query parameter",
             "token_suspended": "Token has been suspended",
             "token_expired": "Token has expired",
             "token_invalid_status": "Token has an invalid status",

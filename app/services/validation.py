@@ -1,9 +1,10 @@
 """Validation service for authorization logic."""
 
+import asyncio
 import logging
 from datetime import datetime
 
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings
@@ -20,6 +21,17 @@ logger = logging.getLogger(__name__)
 
 class ValidationService:
     """Service for authorization validation logic with proper transaction management."""
+
+    @staticmethod
+    def _is_duplicate_session_insert(error: DatabaseError) -> bool:
+        """Check whether a DatabaseError came from duplicate session_id insertion."""
+        original = getattr(error, "original_error", None)
+        if not isinstance(original, IntegrityError):
+            return False
+
+        # Keep this broad across supported DBs/drivers (PostgreSQL/MySQL/SQLite).
+        message = str(original).lower()
+        return "duplicate" in message and "session_id" in message
 
     @staticmethod
     async def validate_authorization(
@@ -123,8 +135,15 @@ class ValidationService:
                 await db.commit()
                 return False, "stream_not_allowed", token_obj
 
+            token_user_id = token_obj.user_id
+            token_id = token_obj.id
+
             # 6. Check concurrent sessions limit with proper locking
-            session_id = generate_session_id(stream_name, client_ip, token)
+            session_id = generate_session_id(
+                stream_name,
+                client_ip,
+                token,
+            )
             existing_session = await SessionService.get_by_session_id(db, session_id)
 
             if existing_session:
@@ -133,7 +152,7 @@ class ValidationService:
                 # so we can safely extend the session
                 await SessionService.update_session_last_check(db, session_id, settings.auth_duration)
                 await AccessLogService.log_access(
-                    db, token, token_obj.user_id, stream_name, client_ip, protocol,
+                    db, token, token_user_id, stream_name, client_ip, protocol,
                     AccessResult.ALLOWED, "session_recheck", settings
                 )
                 await db.commit()
@@ -142,31 +161,30 @@ class ValidationService:
                 # New session attempt - CRITICAL: Use SELECT FOR UPDATE to prevent race conditions
                 # Lock existing sessions for this user to prevent concurrent insertions
                 active_sessions = await SessionService.get_active_sessions_for_update(
-                    db, token_obj.user_id, exclude_session_id=session_id
+                    db, token_user_id, exclude_session_id=session_id
                 )
 
-                # Check if this is a channel switch (same token+IP, different stream)
-                # In IPTV, when user switches channel, old session should be replaced
+                # Channel switch handling: for the same token+IP, keep only the latest stream session.
+                # This prevents "can't switch channel" when old stream sessions are still alive.
                 sessions_from_same_source = [
                     s for s in active_sessions
-                    if s.client_ip == client_ip and s.token_id == token_obj.id
+                    if s.client_ip == client_ip and s.token_id == token_id
                 ]
 
-                # Remove old sessions from the same source (token+IP) to allow channel switching
                 for old_session in sessions_from_same_source:
                     logger.info(
-                        f"Channel switch detected: replacing session for stream '{old_session.stream_name}' "
-                        f"with new stream '{stream_name}' (user={token_obj.user_id}, ip={client_ip})"
+                        "Channel switch detected: replacing old session "
+                        f"(user={token_user_id}, ip={client_ip}, old_stream={old_session.stream_name}, "
+                        f"new_stream={stream_name})"
                     )
                     await SessionService.delete_session_by_id(db, old_session.id)
 
-                # Recalculate active sessions after removing switched sessions
                 remaining_sessions = [s for s in active_sessions if s not in sessions_from_same_source]
                 active_count = len(remaining_sessions)
 
                 if active_count >= token_obj.max_sessions:
                     await AccessLogService.log_access(
-                        db, token, token_obj.user_id, stream_name, client_ip, protocol,
+                        db, token, token_user_id, stream_name, client_ip, protocol,
                         AccessResult.DENIED,
                         f"max_sessions_reached ({active_count}/{token_obj.max_sessions})",
                         settings
@@ -174,24 +192,67 @@ class ValidationService:
                     await db.commit()
                     return False, "max_sessions_reached", token_obj
 
-                # Create new session within the same transaction (locks held until commit)
-                await SessionService.create_session(
-                    db=db,
-                    session_id=session_id,
-                    token_id=token_obj.id,
-                    user_id=token_obj.user_id,
-                    stream_name=stream_name,
-                    client_ip=client_ip,
-                    protocol=protocol,
-                    auth_duration=settings.auth_duration,
-                )
+                # Create new session within the same transaction (locks held until commit).
+                # If a concurrent identical request inserts first, treat duplicate insert as recheck.
+                try:
+                    await SessionService.create_session(
+                        db=db,
+                        session_id=session_id,
+                        token_id=token_id,
+                        user_id=token_user_id,
+                        stream_name=stream_name,
+                        client_ip=client_ip,
+                        protocol=protocol,
+                        auth_duration=settings.auth_duration,
+                    )
 
-                await AccessLogService.log_access(
-                    db, token, token_obj.user_id, stream_name, client_ip, protocol,
-                    AccessResult.ALLOWED, "new_session", settings
-                )
-                await db.commit()
-                return True, None, token_obj
+                    await AccessLogService.log_access(
+                        db, token, token_user_id, stream_name, client_ip, protocol,
+                        AccessResult.ALLOWED, "new_session", settings
+                    )
+                    await db.commit()
+                    return True, None, token_obj
+                except DatabaseError as e:
+                    if not ValidationService._is_duplicate_session_insert(e):
+                        raise
+
+                    # The transaction is aborted after integrity errors; reset it before re-reading.
+                    await db.rollback()
+                    logger.info(
+                        "Concurrent session insert detected; converting to session_recheck "
+                        f"(user={token_user_id}, stream={stream_name}, ip={client_ip})"
+                    )
+
+                    # Winner transaction may not be committed yet, so poll briefly.
+                    for _ in range(5):
+                        concurrent_session = await SessionService.get_by_session_id(db, session_id)
+                        if concurrent_session:
+                            await SessionService.update_session_last_check(db, session_id, settings.auth_duration)
+                            await AccessLogService.log_access(
+                                db, token, token_user_id, stream_name, client_ip, protocol,
+                                AccessResult.ALLOWED, "session_recheck", settings
+                            )
+                            await db.commit()
+                            return True, None, token_obj
+                        await asyncio.sleep(0.05)
+
+                    # If still not visible, retry creation once on a clean transaction.
+                    await SessionService.create_session(
+                        db=db,
+                        session_id=session_id,
+                        token_id=token_id,
+                        user_id=token_user_id,
+                        stream_name=stream_name,
+                        client_ip=client_ip,
+                        protocol=protocol,
+                        auth_duration=settings.auth_duration,
+                    )
+                    await AccessLogService.log_access(
+                        db, token, token_user_id, stream_name, client_ip, protocol,
+                        AccessResult.ALLOWED, "new_session", settings
+                    )
+                    await db.commit()
+                    return True, None, token_obj
 
         except (DatabaseError, SQLAlchemyError) as e:
             # Rollback on any database error to maintain consistency

@@ -60,7 +60,7 @@ class DeniedResponse(BaseModel):
     error: str = Field("access_denied", description="Error type")
     reason: str = Field(
         ...,
-        description="Denial reason: token_not_found, token_suspended, token_expired, "
+        description="Denial reason: missing_token, token_not_found, token_suspended, token_expired, "
         "token_invalid_status, token_not_yet_valid, max_sessions_reached, ip_not_allowed, stream_not_allowed",
     )
     message: str = Field(..., description="Human-readable error message")

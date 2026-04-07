@@ -2,9 +2,13 @@
 import hashlib
 
 
-def generate_session_id(stream_name: str, client_ip: str, token: str) -> str:
+def generate_session_id(
+    stream_name: str,
+    client_ip: str,
+    token: str,
+) -> str:
     """
-    Generate session ID using Flussonic's method: hash(name + ip + token)
+    Generate session ID for active session tracking.
 
     Args:
         stream_name: Stream name

@@ -6,6 +6,7 @@ A production-ready FastAPI authentication backend for Flussonic Media Server wit
 
 - **Token-Based Authentication** - Secure token validation for Flussonic Media Server streams
 - **Concurrent Session Limiting** - Control maximum simultaneous streams per user with race condition prevention
+- **Idempotent Rechecks** - Concurrent identical auth checks are handled as rechecks instead of failing
 - **Access Control Lists** - IP whitelist and stream whitelist per token
 - **Time-Based Validity** - Token validity periods with automatic expiration handling
 - **Access Logging** - Comprehensive audit trail of all authorization attempts
@@ -143,7 +144,7 @@ Headers:
 ```json
 {
   "error": "access_denied",
-  "reason": "token_not_found|token_suspended|token_expired|token_not_yet_valid|max_sessions_reached|ip_not_allowed|stream_not_allowed",
+  "reason": "missing_token|token_not_found|token_suspended|token_expired|token_invalid_status|token_not_yet_valid|max_sessions_reached|ip_not_allowed|stream_not_allowed",
   "message": "Human-readable error message",
   "user_id": "user_id_if_found"
 }
@@ -155,6 +156,7 @@ Headers:
 |----------|--------|-------------|
 | `/` | GET | Service info and endpoint list |
 | `/health` | GET | Health check (returns `{"status": "healthy"}`) |
+| `/stats` | GET | Active sessions and active tokens counters |
 
 ### Token Management API (Protected*)
 
@@ -386,6 +388,13 @@ This enables:
 - Detection of re-checks vs. new sessions
 - Consistent session tracking across Flussonic's periodic auth checks
 - No need for additional database lookups
+
+### Session Counting Rules
+
+- Same `stream_name` + same `ip` + same `token` => same `session_id` (treated as one active session)
+- Same `ip` + same `token` + different `stream_name` => old session is replaced (channel switch behavior)
+- Concurrent identical auth requests are handled idempotently (resolved as `session_recheck`)
+- Important: without an upstream device identifier, multiple devices behind the same public IP can be merged by channel-switch replacement.
 
 ## API Security
 
