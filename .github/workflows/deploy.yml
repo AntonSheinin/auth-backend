@@ -19,4 +19,7 @@ jobs:
             cd ~/auth-backend
             git fetch origin main
             git reset --hard origin/main
-            docker compose up -d --build --force-recreate
+            docker compose build auth-backend
+            docker compose up -d db
+            docker compose run --rm auth-backend alembic upgrade head
+            docker compose up -d --force-recreate auth-backend
